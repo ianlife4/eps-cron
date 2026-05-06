@@ -1,0 +1,82 @@
+name: EPS Daily Cron
+
+on:
+  schedule:
+    # UTC 時間 — 台灣 +8。
+    # 10:00 UTC = 18:00 TW (證交所收盤後第一波)
+    # 13:30 UTC = 21:30 TW (櫃買晚間公告補抓)
+    - cron: '0 10 * * 1-5'
+    - cron: '30 13 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      force_all:
+        description: '全部當新公告 (backfill / 重跑)'
+        type: boolean
+        default: false
+      no_ai:
+        description: '跳過 AI 評分'
+        type: boolean
+        default: false
+      max_ai:
+        description: 'AI 評分最大筆數'
+        type: string
+        default: '100'
+
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install deps
+        run: pip install -r requirements.txt anthropic pydantic
+
+      - name: Run EPS daily
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SCORE_MODEL: ${{ vars.SCORE_MODEL || 'claude-haiku-4-5' }}
+        run: |
+          ARGS="--scope twse_tpex"
+          if [ "${{ inputs.force_all }}" = "true" ]; then
+            ARGS="$ARGS --force-all"
+          fi
+          if [ "${{ inputs.no_ai }}" = "true" ]; then
+            ARGS="$ARGS --no-ai"
+          fi
+          ARGS="$ARGS --max-ai ${{ inputs.max_ai || '100' }}"
+          echo "Running: python src/main.py $ARGS"
+          python src/main.py $ARGS
+
+      - name: Commit snapshot + report (idempotent)
+        run: |
+          git config user.name "eps-cron-bot"
+          git config user.email "eps-cron@noreply.github.com"
+          git add data/snapshots/ reports/ || true
+          # idempotent skip — 沿用 aurora-cron pattern
+          if git diff --staged --quiet; then
+            echo "✓ No changes (idempotent skip)"
+          else
+            git commit -m "📊 EPS daily $(date -u +'%Y-%m-%d %H:%M UTC')"
+            git push
+            echo "✓ Committed snapshot + report"
+          fi
+
+      - name: Upload report as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eps-report-${{ github.run_id }}
+          path: reports/*.xlsx
+          retention-days: 30

@@ -21,11 +21,15 @@ on:
         description: 'AI 評分最大筆數'
         type: string
         default: '100'
+      no_revenue:
+        description: '跳過月營收 (省一半時間)'
+        type: boolean
+        default: false
 
 jobs:
   daily:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 350
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,6 +60,9 @@ jobs:
             ARGS="$ARGS --no-ai"
           fi
           ARGS="$ARGS --max-ai ${{ inputs.max_ai || '100' }}"
+          if [ "${{ inputs.no_revenue }}" = "true" ]; then
+            ARGS="$ARGS --no-revenue"
+          fi
           echo "Running: python src/main.py $ARGS"
           python src/main.py $ARGS
 

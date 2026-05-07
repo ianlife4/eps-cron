@@ -13,6 +13,40 @@ def quarter_label(date_str: str) -> str:
     return f'{y}Q{q}'
 
 
+def freshest_quarter_end(today) -> str:
+    """回傳「目前應該是最新一季公告期」對應的季底日期。
+
+    判斷依據：台股財報截止日 (Q1=5/15, Q2=8/14, Q3=11/14, Q4=隔年3/31)
+    回傳「截至今天，最近一個應已公告的季底」。
+
+    範例:
+      today=2026-05-07 → '2026-03-31' (Q1 公告期, 5/15 截止)
+      today=2026-08-13 → '2026-06-30' (Q2 公告期)
+      today=2026-02-15 → '2025-12-31' (Q4 公告期, 3/31 截止)
+    """
+    from datetime import datetime
+    if isinstance(today, str):
+        today = datetime.strptime(today, '%Y-%m-%d')
+    y, m, d = today.year, today.month, today.day
+
+    # 各季公告期: Apr-May 公告 Q1, Jul-Aug 公告 Q2, Oct-Nov 公告 Q3, Jan-Mar 公告前年 Q4
+    # 取「目前正在公告的季」對應的季底
+    if m >= 4 and m <= 5:
+        return f'{y}-03-31'   # Q1 公告期
+    elif m >= 7 and m <= 8:
+        return f'{y}-06-30'   # Q2 公告期
+    elif m >= 10 and m <= 11:
+        return f'{y}-09-30'   # Q3 公告期
+    elif m >= 1 and m <= 3:
+        return f'{y - 1}-12-31'  # Q4 公告期 (前年)
+    else:
+        # 6/9/12 月為「公告淡季」, 用上一個公告期的季底
+        if m == 6: return f'{y}-03-31'   # Q1 結束
+        if m == 9: return f'{y}-06-30'   # Q2 結束
+        if m == 12: return f'{y}-09-30'  # Q3 結束
+    return f'{y}-03-31'  # fallback
+
+
 def same_quarter_last_year(date_str: str) -> str:
     """'2025-03-31' -> '2024-03-31'"""
     y, m, d = date_str.split('-')

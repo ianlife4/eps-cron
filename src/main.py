@@ -26,7 +26,7 @@ load_dotenv(BASE / '.env', override=True)
 from fetch_eps import (fetch_stock_list, fetch_quarterly_eps, fetch_batch,
                        save_snapshot, load_snapshot)
 from fetch_revenue import fetch_monthly_revenue, fetch_batch_monthly, analyze_revenue
-from compare import analyze_one
+from compare import analyze_one, freshest_quarter_end
 from score import score_rule_based
 from report import build_report
 from notify import send_message, send_document, format_daily_summary
@@ -63,20 +63,36 @@ def is_target_market(market: str) -> bool:
     return market in ('twse', 'tpex', 'TWSE', 'TPEx', 'tib', 'TIB')
 
 
-def detect_new_releases(today_eps: dict, yesterday_eps: dict) -> set:
-    """偵測哪些股票今天有新季度公告 (相對昨日 snapshot)。
+def detect_new_releases(today_eps: dict, yesterday_eps: dict, freshest_q: str) -> set:
+    """偵測哪些股票「剛公告了最新一季」(對應 freshest_q 季底日期)。
+
+    嚴格定義:
+      1. 今天 latest_date == freshest_q (是最新一季)
+      2. AND 昨天 latest_date != freshest_q (昨天還沒這季資料 → 今天才剛出)
+         OR 昨天 snapshot 沒這檔股票
+
+    這樣會過濾掉「latest 還停留在上一季」的所有股票。
+
     回傳 set of stock_id。
     """
     new = set()
     for sid, today in today_eps.items():
         if not today: continue
+        # 找今天 latest date
+        today_latest = max(
+            (d for d, fin in today.items() if fin.get('eps') is not None),
+            default=None
+        )
+        if today_latest != freshest_q:
+            continue  # 還沒公告最新一季 → 跳過
+        # 對昨日資料
         yesterday = yesterday_eps.get(sid, {})
-        # 找今天有但昨天沒有的季度（且 EPS 不為 None）
-        for date, fin in today.items():
-            if fin.get('eps') is None: continue
-            if date not in yesterday or yesterday[date].get('eps') is None:
-                new.add(sid)
-                break
+        yesterday_latest = max(
+            (d for d, fin in yesterday.items() if fin.get('eps') is not None),
+            default=None
+        )
+        if yesterday_latest != today_latest:
+            new.add(sid)  # 昨天還沒這季 → 是真正新公告
     return new
 
 
@@ -148,12 +164,13 @@ def run_daily(force_all: bool = False, scope: str = 'twse_tpex',
     print(f'  存 snapshot: {snap_file.name}')
 
     # 4. 偵測新公告
+    freshest_q = freshest_quarter_end(today_str)
+    print(f'[3] 篩選: 最新一季 = {freshest_q}')
+    new_set = detect_new_releases(eps_data, yesterday_eps if not force_all else {}, freshest_q)
     if force_all:
-        new_set = set(target_ids)
-        print(f'[3] FORCE_ALL: 全部 {len(new_set)} 檔當新公告處理')
+        print(f'[3] FORCE_ALL: 偵測到 {len(new_set)} 檔已公告 {freshest_q} 為最新一季')
     else:
-        new_set = detect_new_releases(eps_data, yesterday_eps)
-        print(f'[3] 偵測到 {len(new_set)} 檔有新公告')
+        print(f'[3] 偵測到 {len(new_set)} 檔今天剛公告 {freshest_q}')
 
     # 5. 分析 + 規則版評分 (全部)
     print('[4] 分析 + 規則版評分...')

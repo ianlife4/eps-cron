@@ -137,9 +137,11 @@ def run_daily(force_all: bool = False, scope: str = 'twse_tpex',
             yesterday_eps = json.loads(latest.read_text(encoding='utf-8'))
             print(f'  載入 snapshot: {latest.name} ({len(yesterday_eps)} 檔)')
 
-    # 3. 抓今日 EPS
-    print('[2] 抓 EPS 資料...')
-    eps_data = fetch_batch(target_ids, start_date, end_date, throttle_sec=0.2, progress=True)
+    # 3. 抓今日 EPS (有 FinMind token 加速)
+    has_token = bool(os.environ.get('FINMIND_TOKEN'))
+    throttle = 0.6 if not has_token else 0.7  # token: 6000/hr ≈ 1.67/sec, 留餘量 0.7s/req
+    print(f'[2] 抓 EPS 資料 (throttle={throttle}s, token={"✓" if has_token else "✗"})...')
+    eps_data = fetch_batch(target_ids, start_date, end_date, throttle_sec=throttle, progress=True)
 
     # 存 snapshot
     snap_file = save_snapshot(eps_data, f'eps_{today_str}')
@@ -214,7 +216,7 @@ def run_daily(force_all: bool = False, scope: str = 'twse_tpex',
         rev_start = (datetime.now().replace(month=1, day=1).year - 1)
         rev_start_date = f'{rev_start}-01-01'
         rev_raw = fetch_batch_monthly(target_ids, rev_start_date, end_date,
-                                      throttle_sec=0.2, progress=True)
+                                      throttle_sec=throttle, progress=True)
         # 偵測「月營收新公告」: 比對昨日月份是否變化 (簡化: 只要有最新月就算)
         for sid in target_ids:
             if sid not in rev_raw or not rev_raw[sid]:

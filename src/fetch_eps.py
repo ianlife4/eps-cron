@@ -14,6 +14,9 @@ from typing import Optional
 FINMIND_API = 'https://api.finmindtrade.com/api/v4/data'
 DATA_DIR = Path(__file__).parent.parent / 'data'
 
+import os as _os
+FINMIND_TOKEN = _os.environ.get('FINMIND_TOKEN', '').strip()
+
 # FinMind 重要欄位對照
 EPS_FIELDS = {
     'EPS': 'eps',
@@ -27,7 +30,9 @@ EPS_FIELDS = {
 
 
 def _http_get(url: str, params: dict, retries: int = 3, timeout: int = 30) -> Optional[dict]:
-    """HTTP GET with retry."""
+    """HTTP GET with retry. 自動加 FinMind token."""
+    if FINMIND_TOKEN and 'token' not in params:
+        params = {**params, 'token': FINMIND_TOKEN}
     qs = urllib.parse.urlencode(params)
     full = f'{url}?{qs}'
     for attempt in range(retries):

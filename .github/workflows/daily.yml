@@ -53,6 +53,7 @@ jobs:
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
           SCORE_MODEL: ${{ vars.SCORE_MODEL || 'claude-haiku-4-5' }}
         run: |
           ARGS="--scope twse_tpex"

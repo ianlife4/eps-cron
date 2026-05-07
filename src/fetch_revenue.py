@@ -9,8 +9,13 @@ from typing import Optional
 
 FINMIND_API = 'https://api.finmindtrade.com/api/v4/data'
 
+import os as _os
+FINMIND_TOKEN = _os.environ.get('FINMIND_TOKEN', '').strip()
+
 
 def _http_get(url: str, params: dict, retries: int = 3, timeout: int = 30) -> Optional[dict]:
+    if FINMIND_TOKEN and 'token' not in params:
+        params = {**params, 'token': FINMIND_TOKEN}
     qs = urllib.parse.urlencode(params)
     full = f'{url}?{qs}'
     for attempt in range(retries):

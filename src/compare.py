@@ -133,9 +133,12 @@ def analyze_one(stock_id: str, eps_data: dict, year_now: int = 2026) -> dict:
     sorted_dates = sorted([d for d in eps_data if eps_data[d].get('eps') is not None])
     idx = sorted_dates.index(latest_date) if latest_date in sorted_dates else -1
     qoq = None
+    prev_q_date = None
+    prev_q_eps = None
     if idx > 0:
-        prev_eps = eps_data[sorted_dates[idx - 1]].get('eps')
-        qoq = compute_yoy(latest_eps, prev_eps)
+        prev_q_date = sorted_dates[idx - 1]
+        prev_q_eps = eps_data[prev_q_date].get('eps')
+        qoq = compute_yoy(latest_eps, prev_q_eps)
 
     fin = eps_data[latest_date]
     return {
@@ -147,6 +150,8 @@ def analyze_one(stock_id: str, eps_data: dict, year_now: int = 2026) -> dict:
         'yoy_eps': yoy_eps,
         'yoy': yoy,
         'qoq': qoq,
+        'prev_quarter': quarter_label(prev_q_date) if prev_q_date else None,
+        'prev_quarter_eps': prev_q_eps,
         'accumulated': accum,
         'prior_year_full': prior_full,
         'achievement_pct': achievement_pct,

@@ -26,7 +26,7 @@ load_dotenv(BASE / '.env', override=True)
 from fetch_eps import (fetch_stock_list, fetch_quarterly_eps, fetch_batch,
                        save_snapshot, load_snapshot)
 from fetch_revenue import fetch_monthly_revenue, fetch_batch_monthly, analyze_revenue
-from compare import analyze_one, freshest_quarter_end
+from compare import analyze_one, freshest_quarter_end, quarter_label
 from score import score_rule_based
 from report import build_report
 from notify import send_message, send_document, format_daily_summary
@@ -257,8 +257,9 @@ def run_daily(force_all: bool = False, scope: str = 'twse_tpex',
     # 6. 產 Excel
     print('[5] 產出 Excel...')
     excel_path = REPORTS_DIR / f'eps_daily_{today_str}.xlsx'
-    build_report(today_str, releases, monthly_data, stats, str(excel_path))
-    print(f'  產出: {excel_path}')
+    q_label = quarter_label(freshest_q)  # e.g. '2026Q1'
+    build_report(today_str, releases, monthly_data, stats, str(excel_path), q_label=q_label)
+    print(f'  產出: {excel_path} (當期: {q_label})')
 
     # 7. 發 Telegram (僅當有新公告)
     if no_tg:

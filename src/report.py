@@ -53,18 +53,19 @@ def _set_widths(ws, widths: list):
             ws.column_dimensions[get_column_letter(i)].width = w
 
 
-def _draw_title(ws, row: int, text: str, span_cols: int, fill: PatternFill, big: bool = True):
-    """畫色塊大標題 — 對齊 v3 風格。"""
-    cell = ws.cell(row=row, column=1, value=text)
-    cell.font = FONT_TITLE if big else FONT_TITLE_MD
-    cell.fill = fill
-    cell.alignment = ALIGN_LEFT
+def _draw_title(ws, row: int, text: str, span_cols: int, fill: PatternFill,
+                big: bool = True, align: str = 'center'):
+    """畫色塊大標題 — 對齊 v3 風格 (預設置中)。"""
     # 整列填底色
     for c in range(1, span_cols + 1):
         ws.cell(row=row, column=c).fill = fill
+    cell = ws.cell(row=row, column=1, value=text)
+    cell.font = FONT_TITLE if big else FONT_TITLE_MD
+    cell.fill = fill
+    cell.alignment = Alignment(horizontal=align, vertical='center')
     if span_cols > 1:
         ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=span_cols)
-    ws.row_dimensions[row].height = 28 if big else 22
+    ws.row_dimensions[row].height = 32 if big else 24
 
 
 def _format_reasons(reasons, max_items: int = 3) -> str:
@@ -110,62 +111,60 @@ def _is_won_full_year(r: dict) -> bool:
     return False
 
 
-def write_summary(ws, date_str: str, stats: dict, releases: list = None, q_label: str = None):
-    """摘要分頁 — 對齊 v3 視覺：色塊大標 + 統計卡片 + 已贏全年清單 + 觀察重點"""
-    # A: 標籤 (28 寬足夠 "📊 全市場分析筆數" 8 chinese chars + emoji)
-    # B: 名稱; C: 主資料; D: 倍數; E: 評分; F: 評分理由
-    _set_widths(ws, [28, 14, 26, 12, 8, 55])
+def write_summary(ws, date_str: str, stats: dict, releases: list = None, q_label: str = None,
+                  has_revenue: bool = True):
+    """摘要分頁 — 對齊 v3「2026Q1 EPS 公告 vs 2025 比較整理」layout:
+      [藍底大標 + 副標 (置中)]
+      [紅 banner: 已確認 EPS 已贏全年 (置中)]
+      [Header + 黃高亮資料表]
+      [紅 banner: 重要觀察 (置中)]
+      [bullet 表格列]
+      [紅 banner: 工作表索引 (置中)]
+      [Sheet 名 + 描述 表格]
+      [灰斜字 footer]
+    """
+    _set_widths(ws, [11, 14, 26, 14, 8, 55])
+    prior_year = _prior_year(q_label) if q_label else None
 
-    # 大標題 (色塊)
-    _draw_title(ws, 1, f'📊 EPS 日報 {date_str}', 6, FILL_TITLE_BLUE, big=True)
+    # === [1] 大藍標題 + 副標 (置中) ===
+    if q_label:
+        title = f'{q_label} EPS 日報 vs {prior_year} 比較整理'
+    else:
+        title = f'EPS 日報 {date_str}'
+    _draw_title(ws, 1, title, 6, FILL_TITLE_BLUE, big=True, align='center')
 
-    # 統計卡片 (淡藍底 banner) — A 標籤,B 數值,C-F 留白配合下方表格
-    row = 3
-    stat_pairs = [
-        ('🆕 今日新公告', stats.get('new_count', 0), '檔'),
-        ('🔥 評分 ≥ 8 高度超預期', stats.get('hot_count', 0), '檔'),
-        ('⭐ 評分 6-7 值得關注', stats.get('watch_count', 0), '檔'),
-        ('⚠️ 評分 ≤ -4 衰退警示', stats.get('warn_count', 0), '檔'),
-        ('📊 全市場分析筆數', stats.get('total_count', 0), '檔'),
-    ]
-    for label, val, unit in stat_pairs:
-        c1 = ws.cell(row=row, column=1, value=label)
-        c2 = ws.cell(row=row, column=2, value=f'{val} {unit}')
-        c1.font = Font(name='Microsoft JhengHei', bold=True, size=11, color='1F3864')
-        c1.alignment = ALIGN_LEFT
-        c2.font = Font(name='Microsoft JhengHei', bold=True, size=14, color='C00000')
-        c2.alignment = Alignment(horizontal='left', vertical='center', indent=1)
-        # 整列填底 (合併 C-F 讓視覺整齊)
-        for c in range(1, 7):
-            ws.cell(row=row, column=c).fill = FILL_BANNER
-        c1.border = BORDER
-        c2.border = BORDER
-        ws.merge_cells(start_row=row, start_column=3, end_row=row, end_column=6)
-        # 合併儲存格的右側邊也補 border
-        ws.cell(row=row, column=6).border = BORDER
-        ws.row_dimensions[row].height = 24
-        row += 1
-    row += 1
+    for c in range(1, 7):
+        ws.cell(row=2, column=c).fill = FILL_TITLE_BLUE
+    sub_text = (f'資料來源：FinMind API ({stats.get("total_count", 0)} 檔分析、'
+                f'{stats.get("new_count", 0)} 檔今日新公告)　|　日期：{date_str}　|　'
+                f'AI 評分 by Claude Haiku 4.5')
+    cell = ws.cell(row=2, column=1, value=sub_text)
+    cell.font = Font(name='Microsoft JhengHei', italic=True, size=10, color='FFFFFF')
+    cell.alignment = Alignment(horizontal='center', vertical='center')
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=6)
+    ws.row_dimensions[2].height = 22
 
+    row = 4
+
+    # === [2] 已確認已贏全年 (紅 banner + 黃高亮表) ===
     if releases and q_label:
-        prior_year = _prior_year(q_label)
-        # 🏆 已贏全年確認 list (紅色強調)
         won = [r for r in releases
                if r.get('latest_quarter') == q_label and _is_won_full_year(r)]
         won.sort(key=lambda x: -(x.get('latest_eps') or 0))
 
         if won:
-            _draw_title(ws, row, f'🏆 已確認 {q_label} EPS 已贏 {prior_year} 全年 ({len(won)} 檔)',
-                        6, FILL_TITLE_RED, big=False)
+            _draw_title(ws, row,
+                        f'🏆 已確認 {q_label} EPS 已贏 {prior_year} 全年 ({len(won)} 檔)',
+                        6, FILL_TITLE_RED, big=False, align='center')
             row += 1
-            sub_headers = ['代號', '名稱', f'{q_label} / {prior_year}全年', '倍數', '評分', '評分理由']
+            sub_headers = ['代號', '名稱', f'{q_label} / {prior_year}全年', '倍數', '評分', '重點']
             for c, h in enumerate(sub_headers, 1):
                 cell = ws.cell(row=row, column=c, value=h)
                 cell.font = FONT_HEADER
                 cell.fill = FILL_HEADER
                 cell.alignment = ALIGN_CENTER
                 cell.border = BORDER
-            ws.row_dimensions[row].height = 20
+            ws.row_dimensions[row].height = 22
             row += 1
             for r in won[:10]:
                 ach = r.get('achievement_pct')
@@ -180,7 +179,7 @@ def write_summary(ws, date_str: str, stats: dict, releases: list = None, q_label
                 reasons = _format_reasons(r.get('reasons'), max_items=2)
                 cells = [
                     (1, r.get('stock_id'), ALIGN_CENTER),
-                    (2, r.get('name', ''), ALIGN_LEFT),
+                    (2, r.get('name', ''), ALIGN_CENTER),
                     (3, ratio, ALIGN_CENTER),
                     (4, multi, ALIGN_CENTER),
                     (5, r.get('score'), ALIGN_CENTER),
@@ -192,55 +191,125 @@ def write_summary(ws, date_str: str, stats: dict, releases: list = None, q_label
                     cell.font = FONT_HIGHLIGHT
                     cell.alignment = align
                     cell.border = BORDER
+                ws.row_dimensions[row].height = 22
                 row += 1
             row += 1
 
-        # 📊 觀察重點 (淡藍 banner + bullet)
+        # === [3] 重要觀察 (紅 banner + 表格列) ===
         cur_q = [r for r in releases if r.get('latest_quarter') == q_label]
-        hot8 = [r for r in cur_q if (r.get('score') or 0) >= 8]
-        watch = [r for r in cur_q if 6 <= (r.get('score') or 0) <= 7]
-        notable = [r for r in cur_q if 4 <= (r.get('score') or 0) <= 5]
+        score_dist = {}
+        for r in cur_q:
+            s = r.get('score') or 0
+            if s >= 6:
+                score_dist[s] = score_dist.get(s, 0) + 1
         top3 = sorted([r for r in cur_q if r.get('latest_eps') is not None],
                       key=lambda x: -x['latest_eps'])[:3]
-
-        _draw_title(ws, row, '📊 觀察重點', 6, FILL_TITLE_GREEN, big=False)
-        row += 1
-        bullets = []
-        bullets.append(f'• 共 {len(cur_q)} 檔有 {q_label} EPS 資料；其中 +8 以上 {len(hot8)} 檔、+6~7 {len(watch)} 檔、+4~5 {len(notable)} 檔')
-        if top3:
-            tstr = '、'.join(f'{r.get("name") or r["stock_id"]} {r["latest_eps"]}' for r in top3)
-            bullets.append(f'• {q_label} EPS 最高三名：{tstr}')
-        if won:
-            bullets.append(f'• 已確認 {q_label} 一季賺贏 {prior_year} 全年 {len(won)} 檔（含虧轉盈）')
         cand_count = sum(1 for r in cur_q
                          if r.get('prev_quarter_eps') is not None and r['prev_quarter_eps'] < 0
                          and (r.get('latest_eps') or 0) > 0
                          and not _is_won_full_year(r))
+
+        _draw_title(ws, row, '📊 重要觀察', 6, FILL_TITLE_RED, big=False, align='center')
+        row += 1
+
+        bullets = []
+        if score_dist:
+            dist_str = '、'.join(f'+{s} 分 {n} 檔' for s, n in sorted(score_dist.items(), reverse=True))
+            bullets.append(f'共 {len(cur_q)} 檔有完整 EPS 資料；高分分布：{dist_str}')
+        else:
+            bullets.append(f'共 {len(cur_q)} 檔有完整 EPS 資料')
+        if top3:
+            tstr = '、'.join(f'{r.get("name") or r["stock_id"]} {r["latest_eps"]}' for r in top3)
+            bullets.append(f'{q_label} EPS 最高三名：{tstr}')
+        if won:
+            won_names = '、'.join(f'{r.get("name") or r["stock_id"]}' for r in won[:5])
+            bullets.append(f'已確認 {q_label} 一季賺贏 {prior_year} 全年 {len(won)} 檔：{won_names}{"…" if len(won) > 5 else ""}')
+        non_won_high = [r for r in cur_q if (r.get('score') or 0) >= 7 and not _is_won_full_year(r)]
+        if non_won_high:
+            non_won_high.sort(key=lambda x: -(x.get('latest_eps') or 0))
+            ach_list = []
+            for r in non_won_high[:5]:
+                ach = r.get('achievement_pct')
+                if isinstance(ach, (int, float)):
+                    ach_list.append(f'{r.get("name") or r["stock_id"]} ({ach*100:.0f}%)')
+            if ach_list:
+                bullets.append(f'高分但尚未贏全年（達成率參考）：{"、".join(ach_list)}')
         if cand_count:
-            bullets.append(f'• 候選名單（上季虧損、{q_label} 轉正、待全年驗證）：{cand_count} 檔（見 Sheet「{q_label}贏全年候選」）')
+            bullets.append(f'候選名單（上季虧損 + {q_label} 轉正，待全年驗證）：{cand_count} 檔（見 Sheet 「{q_label}贏全年候選」）')
+
         for b in bullets:
             cell = ws.cell(row=row, column=1, value=b)
             cell.font = Font(name='Microsoft JhengHei', size=11, color='1F3864')
             cell.alignment = Alignment(horizontal='left', vertical='center', indent=1, wrap_text=True)
-            cell.fill = FILL_BANNER
+            for c in range(1, 7):
+                ws.cell(row=row, column=c).border = BORDER
             ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=6)
-            ws.row_dimensions[row].height = 20
+            ws.row_dimensions[row].height = 24
             row += 1
         row += 1
 
-    # 資料來源 / 產出時間
-    foot_label_font = Font(name='Microsoft JhengHei', italic=True, size=9, color='808080')
-    cell = ws.cell(row=row, column=1, value='資料來源')
-    cell.font = foot_label_font
-    cell = ws.cell(row=row, column=2, value='FinMind API + Anthropic Claude Haiku')
-    cell.font = foot_label_font
-    ws.merge_cells(start_row=row, start_column=2, end_row=row, end_column=6)
+    # === [4] 工作表索引 (紅 banner + 表格) ===
+    _draw_title(ws, row, '📑 工作表索引', 6, FILL_TITLE_RED, big=False, align='center')
     row += 1
-    cell = ws.cell(row=row, column=1, value='產出時間')
-    cell.font = foot_label_font
-    cell = ws.cell(row=row, column=2, value=datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-    cell.font = foot_label_font
-    ws.merge_cells(start_row=row, start_column=2, end_row=row, end_column=6)
+
+    sheets_info = [
+        ('摘要', '本頁 — 重點摘要 + 已贏全年清單 + 觀察 + 索引'),
+        ('今日新公告', f'{stats.get("new_count", 0)} 檔今日新公告（依分數排序）'),
+    ]
+    if q_label and releases:
+        won_n = len([r for r in releases if r.get('latest_quarter') == q_label and _is_won_full_year(r)])
+        cand_n = sum(1 for r in releases
+                     if r.get('latest_quarter') == q_label
+                     and r.get('prev_quarter_eps') is not None and r['prev_quarter_eps'] < 0
+                     and (r.get('latest_eps') or 0) > 0
+                     and not _is_won_full_year(r))
+        top_n = len([r for r in releases if r.get('latest_quarter') == q_label and r.get('latest_eps') is not None])
+        if won_n:
+            sheets_info.append((f'{q_label}贏全年確認', f'已驗證 {q_label} 賺贏 {prior_year} 全年（{won_n} 檔）'))
+        if cand_n:
+            sheets_info.append((f'{q_label}贏全年候選', f'上季虧損 + {q_label} 轉正（{cand_n} 檔，待全年驗證）'))
+        if top_n:
+            sheets_info.append((f'{q_label}高EPS排行', f'{q_label} EPS 前 30 名'))
+
+    hi_n = stats.get('hot_count', 0) + stats.get('watch_count', 0)
+    sheets_info.append(('高分排行', f'評分 ≥ 4（{hi_n} 檔）'))
+    if stats.get('warn_count', 0) > 0:
+        sheets_info.append(('衰退警示', f'評分 ≤ -4（{stats.get("warn_count", 0)} 檔）'))
+    sheets_info.append(('完整 EPS', f'全市場 {stats.get("total_count", 0)} 檔依分數排序'))
+    if has_revenue:
+        sheets_info.append(('月營收', '最新月營收 + YoY + 累計'))
+
+    # Sheet 名跨 A:B (寬 11+14 = 25 足夠 "2026Q1贏全年確認"),描述跨 C:F
+    for sheet_name, desc in sheets_info:
+        c1 = ws.cell(row=row, column=1, value=sheet_name)
+        c1.font = Font(name='Microsoft JhengHei', bold=True, size=11, color='1F3864')
+        c1.alignment = Alignment(horizontal='left', vertical='center', indent=1)
+        c1.border = BORDER
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=2)
+        ws.cell(row=row, column=2).border = BORDER
+
+        c2 = ws.cell(row=row, column=3, value=desc)
+        c2.font = Font(name='Microsoft JhengHei', size=10, color='000000')
+        c2.alignment = Alignment(horizontal='left', vertical='center', indent=1)
+        c2.border = BORDER
+        ws.merge_cells(start_row=row, start_column=3, end_row=row, end_column=6)
+        for c in range(4, 7):
+            ws.cell(row=row, column=c).border = BORDER
+        ws.row_dimensions[row].height = 22
+        row += 1
+    row += 1
+
+    # === [5] Footer (灰斜字) ===
+    foot = (f'註：所有 EPS / 營收資料來自 FinMind API；驚喜度評分由 Anthropic Claude Haiku 4.5 '
+            f'依「驚喜度 / 延續性 / 獲利品質」三維度產出（範圍 -9 ~ +9）。'
+            f'達成率 = 今年累計 EPS / 去年全年 EPS。「上季 EPS」指最近一季之前那季'
+            f'（例如本期 Q1 → 上季 = 去年 Q4）。'
+            f'產出時間：{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+    cell = ws.cell(row=row, column=1, value=foot)
+    cell.font = Font(name='Microsoft JhengHei', italic=True, size=9, color='808080')
+    cell.alignment = Alignment(horizontal='left', vertical='top', wrap_text=True, indent=1)
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=6)
+    ws.row_dimensions[row].height = 60
 
 
 def write_releases(ws, releases: list, title: str = '今日新公告', title_fill: PatternFill = None):

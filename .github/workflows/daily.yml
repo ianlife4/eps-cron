@@ -26,6 +26,9 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: write
+
 jobs:
   daily:
     runs-on: ubuntu-latest

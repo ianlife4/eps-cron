@@ -3,9 +3,9 @@
 .env.local
 *.secret
 
-# 報告 / 日誌 (大檔案 + 不適合版控)
-reports/
+# 日誌 (大檔案 + 不適合版控)
 logs/
+# 注意: reports/ 不放 .gitignore，GHA 會 commit Excel 進 repo (檔案不大, 方便回溯)
 
 # Python
 __pycache__/

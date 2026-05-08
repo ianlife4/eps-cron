@@ -2,7 +2,10 @@
 比較邏輯：
 - YoY (本季 vs 去年同季)
 - 累計達成率 (今年累計 vs 去年全年)
+- 公告日期偵測 (掃 snapshots 找該檔最早呈現 q_label 的日期)
 """
+import json
+from pathlib import Path
 from typing import Optional
 
 
@@ -159,6 +162,38 @@ def analyze_one(stock_id: str, eps_data: dict, year_now: int = 2026) -> dict:
         'opm_pct': fin.get('opm_pct'),
         'nonop_pct': fin.get('nonop_pct'),
     }
+
+
+def build_first_seen_map(snapshot_dir: Path, q_end_date: str,
+                         today_str: Optional[str] = None) -> dict:
+    """掃 data/snapshots/eps_*.json，找每檔股票最早出現「latest 已是 q_end_date」的日期。
+
+    用途: 報表加 公告日期 欄。第一次在快照裡看到這檔的 latest_quarter == q_end_date
+    即視為公告日期 (FinMind 沒給原始公告日，只能用 cron 抓到的天數作代理)。
+
+    回傳 {stock_id: 'YYYY-MM-DD'}。今天 (today_str) 才出現的視為今天。
+    沒出現過的 → 不在 dict 裡。
+    """
+    snap_files = sorted(snapshot_dir.glob('eps_*.json'))
+    seen: dict[str, str] = {}
+    for f in snap_files:
+        date = f.stem.replace('eps_', '')
+        try:
+            data = json.loads(f.read_text(encoding='utf-8'))
+        except Exception:
+            continue
+        for sid, eps in data.items():
+            if sid in seen:
+                continue
+            if not eps:
+                continue
+            valid = [d for d, fin in (eps or {}).items()
+                     if isinstance(fin, dict) and fin.get('eps') is not None]
+            if not valid:
+                continue
+            if max(valid) >= q_end_date:
+                seen[sid] = date
+    return seen
 
 
 if __name__ == '__main__':

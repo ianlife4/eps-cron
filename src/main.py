@@ -26,10 +26,11 @@ load_dotenv(BASE / '.env', override=True)
 from fetch_eps import (fetch_stock_list, fetch_quarterly_eps, fetch_batch,
                        save_snapshot, load_snapshot)
 from fetch_revenue import fetch_monthly_revenue, fetch_batch_monthly, analyze_revenue
-from compare import analyze_one, freshest_quarter_end, quarter_label
+from compare import analyze_one, freshest_quarter_end, quarter_label, build_first_seen_map
 from score import score_rule_based
 from report import build_report
-from notify import send_message, send_document, format_daily_summary
+from notify import send_message, send_document, send_photo, format_daily_summary
+from render_image import render_releases_png
 
 # AI 評分 (可選, 沒 API key 自動 fallback 到規則版)
 try:
@@ -254,11 +255,15 @@ def run_daily(force_all: bool = False, scope: str = 'twse_tpex',
     else:
         print('[4c] --no-revenue, 跳過月營收')
 
-    # 6. 產 Excel
+    # 6. 產 Excel + 公告日期掃描
     print('[5] 產出 Excel...')
     excel_path = REPORTS_DIR / f'eps_daily_{today_str}.xlsx'
     q_label = quarter_label(freshest_q)  # e.g. '2026Q1'
-    build_report(today_str, releases, monthly_data, stats, str(excel_path), q_label=q_label)
+    # 掃 snapshots 算 first_seen (此時 today 的 snapshot 已存好, 包含今天剛公告的)
+    first_seen_map = build_first_seen_map(SNAPSHOT_DIR, freshest_q, today_str=today_str)
+    print(f'  掃 snapshots → 公告日期 dict: {len(first_seen_map)} 檔')
+    build_report(today_str, releases, monthly_data, stats, str(excel_path),
+                 q_label=q_label, first_seen_map=first_seen_map)
     print(f'  產出: {excel_path} (當期: {q_label})')
 
     # 7. 發 Telegram (僅當有新公告)
@@ -269,12 +274,59 @@ def run_daily(force_all: bool = False, scope: str = 'twse_tpex',
         token = os.environ['TG_BOT_TOKEN']
         chat_id = os.environ['TG_CHAT_ID']
 
+        # 評分降冪 + latest_eps tiebreaker
         new_only = sorted([r for r in releases if r.get('is_new')],
-                          key=lambda x: -(x.get('score') or -99))
+                          key=lambda x: (-(x.get('score') if x.get('score') is not None else -99),
+                                         -(x.get('latest_eps') or 0)))
         winners = [r for r in new_only if (r.get('score') or 0) >= 8]
         msg = format_daily_summary(today_str, new_only[:30], winners)
         send_message(token, chat_id, msg)
         time.sleep(1)
+
+        # 7a. PNG 表格預覽 (固定 30 筆 top by 評分)
+        try:
+            png_path = REPORTS_DIR / f'eps_daily_{today_str}.png'
+            render_releases_png(
+                new_only,
+                title=f'🆕 今日新公告 ({len(new_only)} 檔, 評分降冪 top {min(30, len(new_only))})',
+                out_path=str(png_path),
+                date_str=today_str,
+                max_rows=30,
+                first_seen_map=first_seen_map,
+            )
+            send_photo(token, chat_id, str(png_path),
+                       caption=f'📸 {today_str} 今日新公告速覽')
+            time.sleep(1)
+            print(f'  ✓ PNG 推送: {png_path.name}')
+        except Exception as e:
+            print(f'  ⚠️ PNG 渲染/推送失敗 (略過, 不影響 Excel 推送): {e}')
+
+        # 7b. 已贏全年確認 (評分降冪) PNG
+        won = [r for r in releases
+               if r.get('latest_quarter') == q_label and
+               (lambda ach: (isinstance(ach, (int, float)) and ach >= 1.0)
+                or (ach == 'prior_loss' and (r.get('latest_eps') or 0) > 0)
+                or (r.get('prior_year_full') is not None and r['prior_year_full'] < 0
+                    and (r.get('latest_eps') or 0) > 0))(r.get('achievement_pct'))]
+        if won:
+            try:
+                won_png = REPORTS_DIR / f'eps_won_{today_str}.png'
+                render_releases_png(
+                    won,
+                    title=f'🏆 已確認 {q_label} EPS 已贏 {int(q_label[:4])-1} 全年 ({len(won)} 檔)',
+                    out_path=str(won_png),
+                    date_str=today_str,
+                    max_rows=30,
+                    first_seen_map=first_seen_map,
+                    subtitle=f'評分降冪 top {min(30, len(won))} | 同日公告同色帶',
+                )
+                send_photo(token, chat_id, str(won_png),
+                           caption=f'🏆 一季賺贏全年明星 ({len(won)} 檔)')
+                time.sleep(1)
+                print(f'  ✓ 贏全年 PNG 推送: {won_png.name}')
+            except Exception as e:
+                print(f'  ⚠️ 贏全年 PNG 失敗 (略過): {e}')
+
         send_document(token, chat_id, str(excel_path),
                       caption=f'📊 EPS 日報 {today_str} ({stats["new_count"]} 檔新公告)')
         print('  ✓ TG 推播完成')

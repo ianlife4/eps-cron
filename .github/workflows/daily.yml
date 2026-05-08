@@ -45,6 +45,11 @@ jobs:
           python-version: '3.12'
           cache: pip
 
+      - name: Install CJK fonts (for PNG render)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-cjk
+
       - name: Install deps
         run: pip install -r requirements.txt anthropic pydantic
 
@@ -74,7 +79,8 @@ jobs:
         run: |
           git config user.name "eps-cron-bot"
           git config user.email "eps-cron@noreply.github.com"
-          git add data/snapshots/ reports/ || true
+          # 不 commit *.png (檔多易爆, TG 已收到)
+          git add data/snapshots/ reports/*.xlsx || true
           # idempotent skip — 沿用 aurora-cron pattern
           if git diff --staged --quiet; then
             echo "✓ No changes (idempotent skip)"

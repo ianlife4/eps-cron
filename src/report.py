@@ -312,13 +312,23 @@ def write_summary(ws, date_str: str, stats: dict, releases: list = None, q_label
     ws.row_dimensions[row].height = 60
 
 
-def write_releases(ws, releases: list, title: str = '今日新公告', title_fill: PatternFill = None):
-    """新公告 / 完整 EPS / 高分 / 衰退 通用分頁 — 對齊 v3 視覺。"""
+def write_releases(ws, releases: list, title: str = '今日新公告', title_fill: PatternFill = None,
+                   first_seen_map: dict = None):
+    """新公告 / 完整 EPS / 高分 / 衰退 通用分頁 — 對齊 v3 視覺。
+
+    若有 first_seen_map → 加「公告日期」欄, 同日期不同色帶。
+    依分數降冪後, 同分內以 latest_eps 降冪做 tiebreak。
+    """
+    has_date = bool(first_seen_map)
     headers = ['代號', '名稱', '市場', '最新季', 'EPS', '去年同季', 'YoY %', 'YoY Δ',
                '累計 EPS', '去年全年', '達成率', 'QoQ %',
                '評分', '級別', '評分理由', 'GM%', 'OPM%', '業外%']
+    widths = [9, 14, 8, 10, 9, 11, 11, 11, 11, 11, 11, 11, 7, 14, 36, 9, 9, 9]
+    if has_date:
+        headers.append('公告日期')
+        widths.append(13)
     # v3 風格欄寬 (代號窄 / 名稱中 / 數值 11~13 / 理由 30+)
-    _set_widths(ws, [9, 14, 8, 10, 9, 11, 11, 11, 11, 11, 11, 11, 7, 14, 36, 9, 9, 9])
+    _set_widths(ws, widths)
 
     # 大標題色塊
     _draw_title(ws, 1, title, len(headers), title_fill or FILL_TITLE_BLUE, big=True)
@@ -332,14 +342,19 @@ def write_releases(ws, releases: list, title: str = '今日新公告', title_fil
         cell.border = BORDER
     ws.row_dimensions[2].height = 22
 
-    for r in releases:
+    # 二次保險: 評分 desc, latest_eps desc
+    sorted_rows = sorted(releases,
+                         key=lambda x: (-(x.get('score') if x.get('score') is not None else -99),
+                                        -(x.get('latest_eps') or 0)))
+
+    for r in sorted_rows:
         yoy = r.get('yoy') or {}
         qoq = r.get('qoq') or {}
         accum = r.get('accumulated') or {}
         ach = r.get('achievement_pct')
         ach_str = (f'{ach*100:.1f}%' if isinstance(ach, (int, float)) else
                    ('去年虧損' if ach == 'prior_loss' else '—'))
-        ws.append([
+        row_data = [
             r.get('stock_id'),
             r.get('name', ''),
             r.get('market', ''),
@@ -358,9 +373,30 @@ def write_releases(ws, releases: list, title: str = '今日新公告', title_fil
             f'{(r.get("gm_pct") or 0)*100:.1f}%' if r.get('gm_pct') is not None else '',
             f'{(r.get("opm_pct") or 0)*100:.1f}%' if r.get('opm_pct') is not None else '',
             f'{(r.get("nonop_pct") or 0)*100:.1f}%' if r.get('nonop_pct') is not None else '',
-        ])
+        ]
+        if has_date:
+            sid = r.get('stock_id')
+            row_data.append(first_seen_map.get(sid, '—'))
+        ws.append(row_data)
+
+    # 同日色帶 mapping (給 公告日期 欄專用底色)
+    date_band_palette = [
+        PatternFill('solid', start_color='C6EFCE'),  # 淡綠 (最新)
+        PatternFill('solid', start_color='FFEB9C'),  # 淡黃
+        PatternFill('solid', start_color='FCE4D6'),  # 淡橘
+        PatternFill('solid', start_color='DDEBF7'),  # 淡藍
+        PatternFill('solid', start_color='F4E1F2'),  # 淡紫
+        PatternFill('solid', start_color='D9D9D9'),  # 淺灰
+    ]
+    date_to_band = {}
+    if has_date:
+        unique_dates = sorted({first_seen_map.get(r.get('stock_id'), '—') for r in sorted_rows},
+                              reverse=True)
+        for i, d in enumerate(unique_dates):
+            date_to_band[d] = date_band_palette[i % len(date_band_palette)]
 
     # 上色 + body 樣式 + alignment
+    date_col_idx = len(headers) if has_date else None
     for row_idx in range(3, ws.max_row + 1):
         score = ws.cell(row=row_idx, column=13).value
         fill = None
@@ -380,6 +416,15 @@ def write_releases(ws, releases: list, title: str = '今日新公告', title_fil
             cell.font = font
             cell.alignment = ALIGN_LEFT if c in (2, 15) else ALIGN_CENTER
             cell.border = BORDER
+        # 公告日期欄獨立色帶 (蓋過分數色, 讓同日視覺成群)
+        if date_col_idx is not None:
+            d_cell = ws.cell(row=row_idx, column=date_col_idx)
+            d_val = d_cell.value
+            band = date_to_band.get(d_val)
+            if band:
+                d_cell.fill = band
+                # 維持字型粗體可讀
+                d_cell.font = Font(name='Microsoft JhengHei', bold=True, size=10, color='1F3864')
 
     # 凍結代號 + 名稱 (前 2 欄) + 標題列
     ws.freeze_panes = 'C3'
@@ -459,16 +504,28 @@ def _style_data_cell(cell, align=None, border=True, font=None):
         cell.border = BORDER
 
 
-def write_won_full_year(ws, releases: list, q_label: str):
-    """已贏全年確認名單 — 累計達成率 ≥ 100% 或 虧轉盈 (對應 v3「Q1贏全年確認名單」)"""
+def write_won_full_year(ws, releases: list, q_label: str,
+                        first_seen_map: dict = None):
+    """已贏全年確認名單 — 累計達成率 ≥ 100% 或 虧轉盈 (對應 v3「Q1贏全年確認名單」)
+
+    排序: 評分 desc (主要), latest_eps desc (tiebreaker)
+    若有 first_seen_map → 加「公告日期」欄, 同日期用色帶區分
+    """
     prior_year = _prior_year(q_label)
     rows = [r for r in releases
             if r.get('latest_quarter') == q_label and _is_won_full_year(r)]
-    rows.sort(key=lambda x: -(x.get('latest_eps') or 0))
+    # 評分降冪 (None 視為 -99 排最後), tiebreaker: latest_eps
+    rows.sort(key=lambda x: (-(x.get('score') if x.get('score') is not None else -99),
+                             -(x.get('latest_eps') or 0)))
 
+    has_date = bool(first_seen_map)
     headers = ['代號', '名稱', f'{q_label} EPS', f'{prior_year}{q_label[-2:]} EPS',
                f'{prior_year} 全年 EPS', '累計/全年', '倍數', '評分']
-    _set_widths(ws, [9, 14, 13, 14, 14, 12, 11, 9])
+    widths = [9, 14, 13, 14, 14, 12, 11, 9]
+    if has_date:
+        headers.append('公告日期')
+        widths.append(13)
+    _set_widths(ws, widths)
 
     # 紅色色塊大標題
     title = f'🏆 已確認 {q_label} EPS > {prior_year} 全年 EPS ({len(rows)} 檔)'
@@ -486,7 +543,7 @@ def write_won_full_year(ws, releases: list, q_label: str):
         cell.border = BORDER
     ws.row_dimensions[3].height = 22
 
-    # Data rows (鮮黃高亮)
+    # Data rows (鮮黃高亮 + 公告日期同日色帶)
     for r in rows:
         ach = r.get('achievement_pct')
         pf = r.get('prior_year_full')
@@ -496,7 +553,7 @@ def write_won_full_year(ws, releases: list, q_label: str):
         else:
             ratio_str = '虧轉盈'
             multi_str = '虧轉盈'
-        ws.append([
+        row_data = [
             r.get('stock_id'),
             r.get('name', ''),
             r.get('latest_eps'),
@@ -505,11 +562,40 @@ def write_won_full_year(ws, releases: list, q_label: str):
             ratio_str,
             multi_str,
             r.get('score'),
-        ])
-    for row_idx in range(4, ws.max_row + 1):
+        ]
+        if has_date:
+            sid = r.get('stock_id')
+            row_data.append(first_seen_map.get(sid, '—'))
+        ws.append(row_data)
+
+    # 為每個獨特日期分配一個色帶 (同日同色, 不同日交替), 用較淡的色相區分
+    date_palette = [
+        FILL_HIGHLIGHT,                              # 鮮黃 (今天 / 最新)
+        PatternFill('solid', start_color='FFEB9C'),  # 淡黃
+        PatternFill('solid', start_color='FCE4D6'),  # 淡橘
+        PatternFill('solid', start_color='E2EFDA'),  # 淡綠
+        PatternFill('solid', start_color='DDEBF7'),  # 淡藍
+        PatternFill('solid', start_color='F4E1F2'),  # 淡紫
+    ]
+    date_to_fill: dict = {}
+    if has_date:
+        # 新→舊出現順序分配色 (rows 已按評分排了, 這裡用 date 去 dedup)
+        unique_dates = []
+        for r in rows:
+            d = first_seen_map.get(r.get('stock_id'), '—')
+            if d not in unique_dates:
+                unique_dates.append(d)
+        # 最新日期 (字典序最大) → 鮮黃, 之後依序給淡色
+        for i, d in enumerate(sorted(unique_dates, reverse=True)):
+            date_to_fill[d] = date_palette[i % len(date_palette)]
+
+    for row_idx, r in enumerate(rows, start=4):
+        sid = r.get('stock_id')
+        first_date = first_seen_map.get(sid, '—') if has_date else None
+        row_fill = date_to_fill.get(first_date, FILL_HIGHLIGHT) if has_date else FILL_HIGHLIGHT
         for c in range(1, len(headers) + 1):
             cell = ws.cell(row=row_idx, column=c)
-            cell.fill = FILL_HIGHLIGHT
+            cell.fill = row_fill
             cell.font = FONT_HIGHLIGHT
             cell.alignment = ALIGN_CENTER if c != 2 else ALIGN_LEFT
             cell.border = BORDER
@@ -665,19 +751,21 @@ def _detect_q_label(releases: list) -> str:
 
 
 def build_report(date_str: str, releases: list, monthly: list, stats: dict, out_path: str,
-                 q_label: str = None):
+                 q_label: str = None, first_seen_map: dict = None):
     """產出完整報告
 
     分頁順序 (v3 風格):
       1. 摘要 — 已贏全年清單 + 觀察重點
-      2. 今日新公告 — 完整欄位
-      3. 已贏全年確認名單 — 一季賺贏全年的明星標的
+      2. 今日新公告 — 完整欄位 + 公告日期色帶
+      3. 已贏全年確認名單 — 一季賺贏全年的明星標的 (含公告日期色帶)
       4. 贏全年候選 — 上季虧損 + 本期轉正 (待全年確認)
       5. 高 EPS 排行 — 當期 EPS 前 30
-      6. 高分排行 — score ≥ 4
+      6. 高分排行 — score ≥ 4 (含公告日期色帶)
       7. 衰退警示 — score ≤ -4
       8. 完整 EPS — 全市場
       9. 月營收
+
+    first_seen_map: {stock_id: 'YYYY-MM-DD'}, 來自 main.py 掃 snapshots。
     """
     if not q_label:
         q_label = _detect_q_label(releases)
@@ -688,12 +776,14 @@ def build_report(date_str: str, releases: list, monthly: list, stats: dict, out_
     ws_sum.title = '摘要'
     write_summary(ws_sum, date_str, stats, releases=releases, q_label=q_label)
 
-    # 今日新公告 (依分數排序)
+    # 今日新公告 (評分降冪 + latest_eps tiebreaker)
     new_only = sorted([r for r in releases if r.get('is_new')],
-                      key=lambda x: -(x.get('score') or -99))
+                      key=lambda x: (-(x.get('score') if x.get('score') is not None else -99),
+                                     -(x.get('latest_eps') or 0)))
     if new_only:
         ws_new = wb.create_sheet('今日新公告')
-        write_releases(ws_new, new_only, f'🆕 今日新公告 ({len(new_only)} 檔)', FILL_TITLE_BLUE)
+        write_releases(ws_new, new_only, f'🆕 今日新公告 ({len(new_only)} 檔)', FILL_TITLE_BLUE,
+                       first_seen_map=first_seen_map)
 
     # v3 風格三個 sheet — 都依 q_label 篩選
     if q_label:
@@ -701,7 +791,7 @@ def build_report(date_str: str, releases: list, monthly: list, stats: dict, out_
                if r.get('latest_quarter') == q_label and _is_won_full_year(r)]
         if won:
             ws_won = wb.create_sheet(f'{q_label}贏全年確認')
-            write_won_full_year(ws_won, releases, q_label)
+            write_won_full_year(ws_won, releases, q_label, first_seen_map=first_seen_map)
 
         cand = [r for r in releases
                 if r.get('latest_quarter') == q_label
@@ -718,24 +808,29 @@ def build_report(date_str: str, releases: list, monthly: list, stats: dict, out_
             ws_top = wb.create_sheet(f'{q_label}高EPS排行')
             write_top_eps(ws_top, releases, q_label, top_n=30)
 
-    # 高分排行 (score ≥ 4)
+    # 高分排行 (score ≥ 4) — tiebreaker latest_eps desc
     hot = sorted([r for r in releases if (r.get('score') or 0) >= 4],
-                 key=lambda x: -(x.get('score') or 0))
+                 key=lambda x: (-(x.get('score') or 0), -(x.get('latest_eps') or 0)))
     if hot:
         ws_hot = wb.create_sheet('高分排行')
-        write_releases(ws_hot, hot, f'🔥 高分排行 (評分 ≥ 4，{len(hot)} 檔)', FILL_TITLE_RED)
+        write_releases(ws_hot, hot, f'🔥 高分排行 (評分 ≥ 4，{len(hot)} 檔)', FILL_TITLE_RED,
+                       first_seen_map=first_seen_map)
 
     # 衰退警示 (score ≤ -4)
     cold = sorted([r for r in releases if (r.get('score') or 0) <= -4],
                   key=lambda x: x.get('score') or 0)
     if cold:
         ws_cold = wb.create_sheet('衰退警示')
-        write_releases(ws_cold, cold, f'⚠️ 衰退警示 (評分 ≤ -4，{len(cold)} 檔)', FILL_TITLE_GOLD)
+        write_releases(ws_cold, cold, f'⚠️ 衰退警示 (評分 ≤ -4，{len(cold)} 檔)', FILL_TITLE_GOLD,
+                       first_seen_map=first_seen_map)
 
     # 完整 EPS
-    full = sorted(releases, key=lambda x: -(x.get('score') or -99))
+    full = sorted(releases,
+                  key=lambda x: (-(x.get('score') if x.get('score') is not None else -99),
+                                 -(x.get('latest_eps') or 0)))
     ws_full = wb.create_sheet('完整 EPS')
-    write_releases(ws_full, full, f'📊 完整 EPS 全市場 ({len(full)} 檔)', FILL_TITLE_BLUE)
+    write_releases(ws_full, full, f'📊 完整 EPS 全市場 ({len(full)} 檔)', FILL_TITLE_BLUE,
+                   first_seen_map=first_seen_map)
 
     # 月營收
     if monthly:

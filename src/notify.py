@@ -12,8 +12,12 @@ from pathlib import Path
 TG_API = 'https://api.telegram.org/bot'
 
 
-def _post(method: str, token: str, data: dict, file_path: str = None) -> dict:
-    """call Telegram API. file_path 不為 None 時用 multipart upload."""
+def _post(method: str, token: str, data: dict, file_path: str = None,
+          file_field: str = 'document', file_mime: str = 'application/octet-stream') -> dict:
+    """call Telegram API. file_path 不為 None 時用 multipart upload.
+
+    file_field: 'document' (sendDocument) 或 'photo' (sendPhoto)
+    """
     url = f'{TG_API}{token}/{method}'
     if file_path:
         # multipart/form-data
@@ -28,8 +32,8 @@ def _post(method: str, token: str, data: dict, file_path: str = None) -> dict:
             file_content = f.read()
         fname = Path(file_path).name
         body += f'--{boundary}\r\n'.encode()
-        body += f'Content-Disposition: form-data; name="document"; filename="{fname}"\r\n'.encode()
-        body += b'Content-Type: application/octet-stream\r\n\r\n'
+        body += f'Content-Disposition: form-data; name="{file_field}"; filename="{fname}"\r\n'.encode()
+        body += f'Content-Type: {file_mime}\r\n\r\n'.encode()
         body += file_content + b'\r\n'
         body += f'--{boundary}--\r\n'.encode()
         req = urllib.request.Request(url, data=body, headers={
@@ -58,7 +62,19 @@ def send_document(token: str, chat_id: str, file_path: str, caption: str = '') -
         'chat_id': chat_id,
         'caption': caption,
         'parse_mode': 'HTML',
-    }, file_path=file_path)
+    }, file_path=file_path, file_field='document',
+       file_mime='application/octet-stream')
+
+
+def send_photo(token: str, chat_id: str, photo_path: str, caption: str = '') -> dict:
+    """送 PNG 圖片 (TG 內嵌預覽). caption 上限 1024 chars."""
+    if len(caption) > 1024:
+        caption = caption[:1020] + '…'
+    return _post('sendPhoto', token, {
+        'chat_id': chat_id,
+        'caption': caption,
+        'parse_mode': 'HTML',
+    }, file_path=photo_path, file_field='photo', file_mime='image/png')
 
 
 def format_daily_summary(date_str: str, new_releases: list, top_winners: list,

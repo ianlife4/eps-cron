@@ -6,6 +6,8 @@
 # 日誌 (大檔案 + 不適合版控)
 logs/
 # 注意: reports/ 不放 .gitignore，GHA 會 commit Excel 進 repo (檔案不大, 方便回溯)
+# 但 PNG 不版控 (TG 推送即用即丟, 避免 binary diff 噪音)
+reports/*.png
 
 # Python
 __pycache__/

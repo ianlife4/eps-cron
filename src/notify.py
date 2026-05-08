@@ -77,6 +77,21 @@ def send_photo(token: str, chat_id: str, photo_path: str, caption: str = '') -> 
     }, file_path=photo_path, file_field='photo', file_mime='image/png')
 
 
+def _fmt_reasons(reasons, max_items: int = 2) -> str:
+    """規則版 reasons 是 list[str], AI 版是 str. 統一輸出 '、' 連接.
+
+    舊版 `'、'.join((reasons or [])[:2])` 對 str 會切前 2 字 → bug.
+    對齊 report.py._format_reasons.
+    """
+    if not reasons:
+        return ''
+    if isinstance(reasons, str):
+        return reasons
+    if isinstance(reasons, list):
+        return '、'.join(str(x) for x in reasons[:max_items])
+    return str(reasons)
+
+
 def format_daily_summary(date_str: str, new_releases: list, top_winners: list,
                          monthly_rev_highlights: list = None) -> str:
     """組裝詳細版摘要訊息 (HTML)。"""
@@ -106,7 +121,7 @@ def format_daily_summary(date_str: str, new_releases: list, top_winners: list,
             sid = r['stock_id']
             name = r.get('name', '')
             label = r.get('label', '')
-            reasons = '、'.join((r.get('reasons') or [])[:2])
+            reasons = _fmt_reasons(r.get('reasons'), max_items=2)
             lines.append(f'  <code>{sid}</code> {name} {label} — {reasons}')
         lines.append('')
 
@@ -119,7 +134,8 @@ def format_daily_summary(date_str: str, new_releases: list, top_winners: list,
             lines.append(f'  <code>{sid}</code> {name} {yoy:+.0f}%')
         lines.append('')
 
-    lines.append('📥 <i>完整 Excel 在下面 ↓</i>')
+    lines.append('📸 <i>表格 PNG 在下方圖片，📥 完整 Excel 在最下方</i>')
+    lines.append('<i>(同日公告同色帶, Excel 各分頁含「公告日期」欄)</i>')
     return '\n'.join(lines)
 
 

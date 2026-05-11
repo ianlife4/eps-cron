@@ -25,8 +25,13 @@ EPS_FIELDS = {
     'OperatingIncome': 'operating_income',
     'TotalNonoperatingIncomeAndExpense': 'nonop',
     'IncomeAfterTaxes': 'net_income',
+    # 歸屬母公司淨利 — 用於 EPS fallback 計算 (FinMind 偶有 EPS row 同步落後)
+    'EquityAttributableToOwnersOfParent': 'parent_income',
     'PreTaxIncome': 'pretax_income',
 }
+
+# 流通股數 cache (per-run, 避免重複 call TaiwanStockShareholding)
+_SHARES_CACHE: dict[str, int] = {}
 
 
 def _http_get(url: str, params: dict, retries: int = 3, timeout: int = 30) -> Optional[dict]:
@@ -61,9 +66,42 @@ def fetch_stock_list(market: str = 'TWSE') -> list:
     return [s for s in data['data'] if s.get('type') == market or market == 'ALL']
 
 
+def fetch_shares_outstanding(stock_id: str) -> Optional[int]:
+    """撈 TaiwanStockShareholding 取最新 NumberOfSharesIssued (流通在外股數).
+
+    用於 EPS fallback 計算: 當 FinMind EPS row 同步落後 (公告當天常見),
+    用 歸母淨利 / 流通股數 自己算 EPS.
+
+    結果 per-run cache (_SHARES_CACHE) 避免重複 API call.
+    回傳 None 表示無資料.
+    """
+    if stock_id in _SHARES_CACHE:
+        return _SHARES_CACHE[stock_id]
+    # 取最近 30 天的最新一筆 (TaiwanStockShareholding 是日資料)
+    from datetime import datetime, timedelta
+    end = datetime.now().strftime('%Y-%m-%d')
+    start = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+    data = _http_get(FINMIND_API, {
+        'dataset': 'TaiwanStockShareholding',
+        'data_id': stock_id,
+        'start_date': start,
+        'end_date': end,
+    })
+    shares = None
+    if data and data.get('data'):
+        latest = max(data['data'], key=lambda x: x.get('date', ''))
+        shares = latest.get('NumberOfSharesIssued')
+    _SHARES_CACHE[stock_id] = shares
+    return shares
+
+
 def fetch_quarterly_eps(stock_id: str, start_date: str, end_date: str) -> dict:
     """撈單檔股票季 EPS 資料。
     回傳 {date: {eps, revenue, gross_profit, ...}}
+
+    當某季 FinMind 缺 EPS row 但有 EquityAttributableToOwnersOfParent (歸母淨利):
+    自動撈流通股數計算 EPS (fin['eps_source'] = 'computed', fin['eps_shares_used'] = N).
+    處理 FinMind 公告當天 EPS 同步落後的常見問題.
     """
     data = _http_get(FINMIND_API, {
         'dataset': 'TaiwanStockFinancialStatements',
@@ -82,14 +120,34 @@ def fetch_quarterly_eps(stock_id: str, start_date: str, end_date: str) -> dict:
         if date not in result:
             result[date] = {}
         result[date][EPS_FIELDS[ftype]] = d['value']
+
+    # === EPS fallback: 缺 EPS 但有歸母淨利 → 自算 ===
+    needs_fallback = []
+    for date, fin in result.items():
+        if fin.get('eps') is None and (
+            fin.get('parent_income') is not None or fin.get('net_income') is not None
+        ):
+            needs_fallback.append(date)
+    if needs_fallback:
+        shares = fetch_shares_outstanding(stock_id)
+        if shares and shares > 0:
+            for date in needs_fallback:
+                fin = result[date]
+                # 優先用歸母淨利 (台股 EPS 標準算法), 沒有再退到合併稅後
+                income = fin.get('parent_income') or fin.get('net_income')
+                if income is not None:
+                    fin['eps'] = round(income / shares, 2)
+                    fin['eps_source'] = 'computed'
+                    fin['eps_shares_used'] = shares
+
     # 計算 GM%, OPM% 衍生指標
     for date, fin in result.items():
         rev = fin.get('revenue')
         if rev and rev != 0:
             fin['gm_pct'] = round(fin.get('gross_profit', 0) / rev, 4) if 'gross_profit' in fin else None
             fin['opm_pct'] = round(fin.get('operating_income', 0) / rev, 4) if 'operating_income' in fin else None
-        # 業外比例
-        ni = fin.get('net_income')
+        # 業外比例 — 優先用歸母, 退到合併
+        ni = fin.get('parent_income') or fin.get('net_income')
         nonop = fin.get('nonop')
         if ni and ni != 0 and nonop is not None:
             fin['nonop_pct'] = round(nonop / ni, 4)

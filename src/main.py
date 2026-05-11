@@ -31,6 +31,7 @@ from score import score_rule_based
 from report import build_report
 from notify import send_message, send_document, send_photo, format_daily_summary
 from render_image import render_releases_png
+from fetch_mops import fetch_mops_supplement
 
 # AI 評分 (可選, 沒 API key 自動 fallback 到規則版)
 try:
@@ -167,6 +168,51 @@ def run_daily(force_all: bool = False, scope: str = 'twse_tpex',
     # 4. 偵測新公告
     freshest_q = freshest_quarter_end(today_str)
     print(f'[3] 篩選: 最新一季 = {freshest_q}')
+
+    # 4b. MOPS 補抓 — FinMind 還沒同步但 MOPS 已公告的 (real-time 補丁)
+    # 找 FinMind 中 latest != freshest_q 的個股, 對照 MOPS 今日公告
+    print(f'[3b] MOPS 補抓 (對 FinMind 沒收到 {freshest_q} 的個股)...')
+    needs_mops = set()
+    for sid, eps in eps_data.items():
+        if not eps:
+            needs_mops.add(sid)
+            continue
+        valid_dates = [d for d, fin in eps.items()
+                       if isinstance(fin, dict) and fin.get('eps') is not None]
+        if not valid_dates or max(valid_dates) != freshest_q:
+            needs_mops.add(sid)
+    print(f'  候選 {len(needs_mops)} 檔需要 MOPS 補抓')
+    try:
+        from datetime import datetime as _dt
+        from datetime import timedelta as _td
+        # 掃今天 + 昨天的公告 (cron 18:00 跑時抓 18:00 前的; 21:30 補抓晚公告)
+        mops_data = {}
+        for delta in range(2):
+            scan_date = (_dt.now() - _td(days=delta)).strftime('%Y-%m-%d')
+            day_supplement = fetch_mops_supplement(
+                scan_date, needs_mops, quarter=1, throttle_sec=0.5, progress=True
+            )
+            for sid, d_data in day_supplement.items():
+                if sid not in mops_data:
+                    mops_data[sid] = d_data
+        print(f'[3b] MOPS 補回 {len(mops_data)} 檔')
+        # 注入到 eps_data
+        for sid, d_data in mops_data.items():
+            if sid not in eps_data:
+                eps_data[sid] = {}
+            for date, fin in d_data.items():
+                # 不覆蓋既有資料 (FinMind 萬一有就用 FinMind)
+                if date not in eps_data[sid]:
+                    eps_data[sid][date] = fin
+                else:
+                    # 既有但缺 eps → 補
+                    if eps_data[sid][date].get('eps') is None and fin.get('eps') is not None:
+                        eps_data[sid][date].update(fin)
+        # 重存 snapshot 含 MOPS 補的
+        save_snapshot(eps_data, f'eps_{today_str}')
+    except Exception as e:
+        print(f'[3b] MOPS 補抓失敗 (不影響主流程): {e}')
+
     new_set = detect_new_releases(eps_data, yesterday_eps if not force_all else {}, freshest_q)
     if force_all:
         print(f'[3] FORCE_ALL: 偵測到 {len(new_set)} 檔已公告 {freshest_q} 為最新一季')

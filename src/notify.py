@@ -2,22 +2,26 @@
 Telegram Bot 通知模組
 - send_message: 文字訊息 (Markdown)
 - send_document: 附 Excel 檔
+- send_photo: PNG 圖片
+- _post 內建 3 次 retry, 避開 TG 偶發 SSL connection reset (WinError 10054)
 """
 import os
 import json
+import time
 import urllib.parse
 import urllib.request
+import urllib.error
 from pathlib import Path
 
 TG_API = 'https://api.telegram.org/bot'
+RETRY_COUNT = 3
+RETRY_BASE_SLEEP = 3  # seconds; 3, 6, 9
 
 
-def _post(method: str, token: str, data: dict, file_path: str = None,
-          file_field: str = 'document', file_mime: str = 'application/octet-stream') -> dict:
-    """call Telegram API. file_path 不為 None 時用 multipart upload.
-
-    file_field: 'document' (sendDocument) 或 'photo' (sendPhoto)
-    """
+def _build_request(method: str, token: str, data: dict, file_path: str = None,
+                   file_field: str = 'document',
+                   file_mime: str = 'application/octet-stream'):
+    """Construct urllib Request. multipart 當 file_path 不為 None."""
     url = f'{TG_API}{token}/{method}'
     if file_path:
         # multipart/form-data
@@ -27,7 +31,6 @@ def _post(method: str, token: str, data: dict, file_path: str = None,
             body += f'--{boundary}\r\n'.encode()
             body += f'Content-Disposition: form-data; name="{k}"\r\n\r\n'.encode()
             body += f'{v}\r\n'.encode()
-        # file
         with open(file_path, 'rb') as f:
             file_content = f.read()
         fname = Path(file_path).name
@@ -36,14 +39,44 @@ def _post(method: str, token: str, data: dict, file_path: str = None,
         body += f'Content-Type: {file_mime}\r\n\r\n'.encode()
         body += file_content + b'\r\n'
         body += f'--{boundary}--\r\n'.encode()
-        req = urllib.request.Request(url, data=body, headers={
+        return urllib.request.Request(url, data=body, headers={
             'Content-Type': f'multipart/form-data; boundary={boundary}'
         })
-    else:
-        encoded = urllib.parse.urlencode(data).encode()
-        req = urllib.request.Request(url, data=encoded)
-    with urllib.request.urlopen(req, timeout=60) as r:
-        return json.loads(r.read())
+    encoded = urllib.parse.urlencode(data).encode()
+    return urllib.request.Request(url, data=encoded)
+
+
+def _post(method: str, token: str, data: dict, file_path: str = None,
+          file_field: str = 'document',
+          file_mime: str = 'application/octet-stream',
+          retries: int = RETRY_COUNT) -> dict:
+    """call Telegram API with retry.
+
+    - 處理 TG 偶發 SSL connection reset (WinError 10054 / ConnectionResetError)
+    - 處理 4xx/5xx HTTPError (TG 有時回 429 rate limit)
+    - file_path 不為 None 時用 multipart upload
+    """
+    last_err = None
+    for attempt in range(1, retries + 1):
+        try:
+            req = _build_request(method, token, data, file_path, file_field, file_mime)
+            with urllib.request.urlopen(req, timeout=60) as r:
+                resp = json.loads(r.read())
+            # TG 200 OK 但 ok:false (例如檔太大 / chat 不存在) → 不重試
+            if not resp.get('ok'):
+                print(f'  [TG] {method} returned ok=false: {resp.get("description")}')
+            return resp
+        except (urllib.error.URLError, ConnectionResetError, TimeoutError) as e:
+            last_err = e
+            if attempt < retries:
+                sleep = RETRY_BASE_SLEEP * attempt
+                print(f'  [TG] {method} attempt {attempt}/{retries} failed: '
+                      f'{type(e).__name__}: {str(e)[:80]} — retry in {sleep}s')
+                time.sleep(sleep)
+            else:
+                print(f'  [TG] {method} all {retries} attempts failed')
+                raise
+    raise last_err  # unreachable
 
 
 def send_message(token: str, chat_id: str, text: str, parse_mode: str = 'HTML') -> dict:

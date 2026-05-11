@@ -110,6 +110,36 @@ def send_photo(token: str, chat_id: str, photo_path: str, caption: str = '') -> 
     }, file_path=photo_path, file_field='photo', file_mime='image/png')
 
 
+def _fmt_vs_full_year(r: dict) -> str:
+    """組「Q1 EPS vs 去年全年」短文字, 例:
+      - 已贏全年:   '25全21.83 (263%)'
+      - 轉虧為盈:   '25全-0.5 → 轉盈'
+      - 還沒贏全年: '25全0.88 (達 22%)'
+      - 缺資料:     ''
+    用 latest_quarter 推導去年: e.g. 2026Q1 → 2025 → '25全'
+    """
+    pf = r.get('prior_year_full')
+    ach = r.get('achievement_pct')
+    latest = r.get('latest_eps')
+    q = r.get('latest_quarter', '')
+    # 取去年代號 (2026Q1 → 「25」)
+    prior_y_short = ''
+    try:
+        prior_y_short = str(int(q[:4]) - 1)[-2:]
+    except (ValueError, IndexError):
+        pass
+    prefix = f'{prior_y_short}全' if prior_y_short else '去年全'
+    if pf is None:
+        return ''
+    if ach == 'prior_loss' or (isinstance(pf, (int, float)) and pf <= 0):
+        if latest and latest > 0:
+            return f'{prefix}{pf}→轉盈'
+        return f'{prefix}{pf}'
+    if isinstance(ach, (int, float)):
+        return f'{prefix}{pf} ({ach*100:.0f}%)'
+    return f'{prefix}{pf}'
+
+
 def _fmt_reasons(reasons, max_items: int = 2) -> str:
     """規則版 reasons 是 list[str], AI 版是 str. 統一輸出 '、' 連接.
 
@@ -143,7 +173,9 @@ def format_daily_summary(date_str: str, new_releases: list, top_winners: list,
             label = r.get('label', '')
             yoy_pct = (r.get('yoy') or {}).get('pct')
             yoy_str = f' YoY {yoy_pct*100:+.0f}%' if yoy_pct is not None else ''
-            lines.append(f'  <code>{sid}</code> {name} {q} EPS={eps}{yoy_str} {label}')
+            vs_full = _fmt_vs_full_year(r)
+            vs_str = f' | {vs_full}' if vs_full else ''
+            lines.append(f'  <code>{sid}</code> {name} {q} EPS={eps}{yoy_str}{vs_str} {label}')
         if len(new_releases) > 10:
             lines.append(f'  ...+ {len(new_releases) - 10} 檔（看 Excel）')
         lines.append('')
@@ -155,7 +187,38 @@ def format_daily_summary(date_str: str, new_releases: list, top_winners: list,
             name = r.get('name', '')
             label = r.get('label', '')
             reasons = _fmt_reasons(r.get('reasons'), max_items=2)
-            lines.append(f'  <code>{sid}</code> {name} {label} — {reasons}')
+            vs_full = _fmt_vs_full_year(r)
+            vs_str = f'｜{vs_full}' if vs_full else ''
+            lines.append(f'  <code>{sid}</code> {name} {label}{vs_str} — {reasons}')
+        lines.append('')
+
+    # 新增區塊: Q1 一季賺贏全年的明星標的 (按倍數降冪 top 10)
+    won_full_year = [
+        r for r in new_releases
+        if isinstance(r.get('achievement_pct'), (int, float)) and r['achievement_pct'] >= 1.0
+    ]
+    won_full_year.sort(key=lambda x: -(x.get('achievement_pct') or 0))
+    if won_full_year:
+        # 推導去年年度: 2026Q1 → 2025
+        q0 = (new_releases[0].get('latest_quarter') or '')
+        prior_year = ''
+        try:
+            prior_year = str(int(q0[:4]) - 1)
+        except (ValueError, IndexError):
+            prior_year = '去年'
+        lines.append(f'<b>📈 一季賺贏 {prior_year} 全年：'
+                     f'{len(won_full_year)} 檔 (按倍數)</b>')
+        for r in won_full_year[:10]:
+            sid = r['stock_id']
+            name = r.get('name', '')
+            eps = r.get('latest_eps')
+            pf = r.get('prior_year_full')
+            ach = r.get('achievement_pct')
+            label = r.get('label', '')
+            if isinstance(ach, (int, float)) and pf:
+                lines.append(f'  <code>{sid}</code> {name} {eps} / {prior_year}全年{pf} = <b>{ach:.2f}x</b> {label}')
+        if len(won_full_year) > 10:
+            lines.append(f'  ...+ {len(won_full_year) - 10} 檔')
         lines.append('')
 
     if monthly_rev_highlights:

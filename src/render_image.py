@@ -123,12 +123,14 @@ def render_releases_png(releases: list, title: str, out_path: str,
         ('季', 75, 'center'),
         ('EPS', 70, 'center'),
         ('去年同季', 80, 'center'),
-        ('YoY%', 90, 'center'),
-        ('達成率', 80, 'center'),
+        ('YoY%', 85, 'center'),
+        ('去年全年', 85, 'center'),  # NEW: Q1 vs 去年全年 EPS
+        ('達成率', 78, 'center'),
+        ('倍數', 65, 'center'),      # NEW: Q1 / 去年全年, 直觀
         ('QoQ%', 80, 'center'),
         ('評分', 55, 'center'),
-        ('級別', 100, 'center'),
-        ('評分理由', 360, 'left'),
+        ('級別', 95, 'center'),
+        ('評分理由', 320, 'left'),
     ]
     if has_date:
         cols.append(('公告日期', 100, 'center'))
@@ -202,12 +204,17 @@ def render_releases_png(releases: list, title: str, out_path: str,
         qoq_pct = (r.get('qoq') or {}).get('pct')
         qoq_str = f'{qoq_pct*100:+.0f}%' if qoq_pct is not None else '—'
         ach = r.get('achievement_pct')
+        pf = r.get('prior_year_full')
         if isinstance(ach, (int, float)):
             ach_str = f'{ach*100:.0f}%'
+            multi_str = f'{ach:.2f}x'
         elif ach == 'prior_loss':
             ach_str = '虧轉盈'
+            multi_str = '虧轉盈'
         else:
             ach_str = '—'
+            multi_str = '—'
+        pf_str = f'{pf}' if pf is not None else '—'
         reasons = r.get('reasons')
         if isinstance(reasons, list):
             reasons_str = '、'.join(str(x) for x in reasons[:2])
@@ -226,7 +233,9 @@ def render_releases_png(releases: list, title: str, out_path: str,
             f'{r.get("latest_eps")}' if r.get('latest_eps') is not None else '—',
             f'{r.get("yoy_eps")}' if r.get('yoy_eps') is not None else '—',
             yoy_str,
+            pf_str,        # 去年全年 EPS (新)
             ach_str,
+            multi_str,     # 倍數 (新)
             qoq_str,
             f'{sc}' if sc is not None else '—',
             r.get('level', ''),

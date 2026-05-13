@@ -316,12 +316,16 @@ def write_summary(ws, date_str: str, stats: dict, releases: list = None, q_label
 
 
 def write_releases(ws, releases: list, title: str = '今日新公告', title_fill: PatternFill = None,
-                   first_seen_map: dict = None, today_str: str = None):
+                   first_seen_map: dict = None, today_str: str = None,
+                   sort_by_date: bool = False):
     """新公告 / 完整 EPS / 高分 / 衰退 通用分頁 — 對齊 v3 視覺。
+
+    sort_by_date:
+      - True (今日新公告): 日期 desc → score desc → EPS desc
+      - False (高分排行 / 完整 EPS / 衰退警示): score desc → EPS desc
 
     若有 first_seen_map → 加「公告日期」欄, 同日期不同色帶。
     今日剛公告 (first_seen == today_str) → 整列鮮綠, 蓋過 score 色, 最醒目。
-    依分數降冪後, 同分內以 latest_eps 降冪做 tiebreak。
     """
     has_date = bool(first_seen_map)
     headers = ['代號', '名稱', '市場', '最新季', 'EPS', '去年同季', 'YoY %', 'YoY Δ',
@@ -346,10 +350,24 @@ def write_releases(ws, releases: list, title: str = '今日新公告', title_fil
         cell.border = BORDER
     ws.row_dimensions[2].height = 22
 
-    # 二次保險: 評分 desc, latest_eps desc
-    sorted_rows = sorted(releases,
-                         key=lambda x: (-(x.get('score') if x.get('score') is not None else -99),
-                                        -(x.get('latest_eps') or 0)))
+    # 排序: sort_by_date=True 用 日期desc → score desc → EPS desc (今日新公告適用)
+    #       sort_by_date=False 用 score desc → EPS desc (高分排行 / 完整 EPS 適用)
+    if sort_by_date and has_date:
+        sorted_rows = sorted(
+            releases,
+            key=lambda x: (
+                first_seen_map.get(x.get('stock_id'), '0000-00-00'),
+                x.get('score') if x.get('score') is not None else -99,
+                x.get('latest_eps') or 0,
+            ),
+            reverse=True,
+        )
+    else:
+        sorted_rows = sorted(
+            releases,
+            key=lambda x: (-(x.get('score') if x.get('score') is not None else -99),
+                           -(x.get('latest_eps') or 0)),
+        )
 
     for r in sorted_rows:
         yoy = r.get('yoy') or {}
@@ -811,17 +829,18 @@ def build_report(date_str: str, releases: list, monthly: list, stats: dict, out_
     ws_sum.title = '摘要'
     write_summary(ws_sum, date_str, stats, releases=releases, q_label=q_label)
 
-    # 今日新公告 (評分降冪 + latest_eps tiebreaker)
-    new_only = sorted([r for r in releases if r.get('is_new')],
-                      key=lambda x: (-(x.get('score') if x.get('score') is not None else -99),
-                                     -(x.get('latest_eps') or 0)))
     # 今日參考: 優先 today_str 參數, 否則退到 date_str
     today_for_highlight = today_str or date_str
+
+    # 今日新公告 sheet 用「日期 desc → score desc → EPS desc」, 讓今日的排在最上
+    # (排序在 write_releases 內部處理, 這裡先給 unsorted list 即可)
+    new_only = [r for r in releases if r.get('is_new')]
 
     if new_only:
         ws_new = wb.create_sheet('今日新公告')
         write_releases(ws_new, new_only, f'🆕 今日新公告 ({len(new_only)} 檔)', FILL_TITLE_BLUE,
-                       first_seen_map=first_seen_map, today_str=today_for_highlight)
+                       first_seen_map=first_seen_map, today_str=today_for_highlight,
+                       sort_by_date=True)
 
     # v3 風格三個 sheet — 都依 q_label 篩選
     if q_label:

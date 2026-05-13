@@ -320,26 +320,35 @@ def run_daily(force_all: bool = False, scope: str = 'twse_tpex',
         token = os.environ['TG_BOT_TOKEN']
         chat_id = os.environ['TG_CHAT_ID']
 
-        # 評分降冪 + latest_eps tiebreaker
-        new_only = sorted([r for r in releases if r.get('is_new')],
-                          key=lambda x: (-(x.get('score') if x.get('score') is not None else -99),
-                                         -(x.get('latest_eps') or 0)))
+        # 今日新公告: 日期 desc → score desc → EPS desc (今日剛公告排最上)
+        # TG 文字訊息也用同樣排序
+        new_only_unsorted = [r for r in releases if r.get('is_new')]
+        new_only = sorted(
+            new_only_unsorted,
+            key=lambda x: (
+                first_seen_map.get(x.get('stock_id'), '0000-00-00'),
+                x.get('score') if x.get('score') is not None else -99,
+                x.get('latest_eps') or 0,
+            ),
+            reverse=True,
+        )
         winners = [r for r in new_only if (r.get('score') or 0) >= 8]
         msg = format_daily_summary(today_str, new_only[:30], winners)
         send_message(token, chat_id, msg)
         time.sleep(1)
 
-        # 7a. PNG 表格預覽 (固定 30 筆 top by 評分)
+        # 7a. PNG 表格預覽 (固定 30 筆, 日期 desc 排序)
         try:
             png_path = REPORTS_DIR / f'eps_daily_{today_str}.png'
             render_releases_png(
-                new_only,
-                title=f'🆕 今日新公告 ({len(new_only)} 檔, 評分降冪 top {min(30, len(new_only))})',
+                new_only_unsorted,  # render_releases_png 內會用 sort_by_date 再排
+                title=f'🆕 今日新公告 ({len(new_only)} 檔, 日期降冪 top {min(30, len(new_only))})',
                 out_path=str(png_path),
                 date_str=today_str,
                 max_rows=30,
                 first_seen_map=first_seen_map,
                 today_str=today_str,
+                sort_by_date=True,
             )
             send_photo(token, chat_id, str(png_path),
                        caption=f'📸 {today_str} 今日新公告速覽')

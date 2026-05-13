@@ -108,20 +108,40 @@ def render_releases_png(releases: list, title: str, out_path: str,
                         date_str: str = '', max_rows: int = 30,
                         first_seen_map: dict = None,
                         subtitle: str = '',
-                        today_str: str = '') -> str:
+                        today_str: str = '',
+                        sort_by_date: bool = False) -> str:
     """渲染 releases 列表為 PNG, 傳回檔案路徑。
 
     欄位順序: 代號 / 名稱 / 季 / EPS / 去年同季 / YoY% / 去年全年 / 達成率 / 倍數 / QoQ% / 評分 / 級別 / 評分理由 / 公告日期
 
+    sort_by_date:
+      - True (用於「今日新公告」): 日期 desc → score desc → EPS desc
+        最新公告在最上面, 今日的所有 row 自然集中於頂端
+      - False (用於「已贏全年」等): score desc → EPS desc (本來邏輯)
+
     今日剛公告 (first_seen == today_str) 的列用鮮綠突顯, 蓋過 score 色.
     today_str 未傳時自動推導 (date_str 或 first_seen_map 中最大日期).
     """
-    # 排序: 評分 desc, latest_eps desc
-    rows = sorted(releases,
-                  key=lambda x: (-(x.get('score') if x.get('score') is not None else -99),
-                                 -(x.get('latest_eps') or 0)))[:max_rows]
-
     has_date = bool(first_seen_map)
+
+    if sort_by_date and has_date:
+        # 三層: 日期 desc → score desc → EPS desc
+        rows = sorted(
+            releases,
+            key=lambda x: (
+                first_seen_map.get(x.get('stock_id'), '0000-00-00'),
+                x.get('score') if x.get('score') is not None else -99,
+                x.get('latest_eps') or 0,
+            ),
+            reverse=True,
+        )[:max_rows]
+    else:
+        # 兩層: score desc → EPS desc
+        rows = sorted(
+            releases,
+            key=lambda x: (-(x.get('score') if x.get('score') is not None else -99),
+                           -(x.get('latest_eps') or 0)),
+        )[:max_rows]
     # 推導「今日」: 優先參數, 退到 date_str, 再退到 first_seen_map 最大值
     if not today_str:
         today_str = date_str

@@ -59,10 +59,12 @@ COL_BORDER = (191, 191, 191)
 COL_BG_HOT = (255, 217, 102)       # 鮮黃 — score≥8
 COL_BG_WARM = (248, 203, 173)      # 暖橘 — score≥4
 COL_BG_COLD = (180, 199, 231)      # 冷藍 — score≤-4
+COL_BG_TODAY = (152, 240, 152)     # 鮮綠 — 今日剛公告 (蓋過 score 色, 更醒目)
 COL_BG_ROW_A = (255, 255, 255)     # 白底
 COL_BG_ROW_B = (242, 242, 242)     # 淺灰
 COL_TEXT = (0, 0, 0)
 COL_TEXT_HIGHLIGHT = (156, 0, 6)   # 深紅 (鮮黃底字)
+COL_TEXT_TODAY = (0, 102, 0)       # 深綠 (鮮綠底字, 對比清晰)
 COL_FOOTER = (128, 128, 128)
 
 
@@ -105,10 +107,14 @@ def _strip_unrenderable(s: str) -> str:
 def render_releases_png(releases: list, title: str, out_path: str,
                         date_str: str = '', max_rows: int = 30,
                         first_seen_map: dict = None,
-                        subtitle: str = '') -> str:
+                        subtitle: str = '',
+                        today_str: str = '') -> str:
     """渲染 releases 列表為 PNG, 傳回檔案路徑。
 
-    欄位順序 (簡潔版): 代號 / 名稱 / 季 / EPS / 去年同季 / YoY% / 達成率 / 評分 / 級別 / 評分理由 / 公告日期
+    欄位順序: 代號 / 名稱 / 季 / EPS / 去年同季 / YoY% / 去年全年 / 達成率 / 倍數 / QoQ% / 評分 / 級別 / 評分理由 / 公告日期
+
+    今日剛公告 (first_seen == today_str) 的列用鮮綠突顯, 蓋過 score 色.
+    today_str 未傳時自動推導 (date_str 或 first_seen_map 中最大日期).
     """
     # 排序: 評分 desc, latest_eps desc
     rows = sorted(releases,
@@ -116,6 +122,13 @@ def render_releases_png(releases: list, title: str, out_path: str,
                                  -(x.get('latest_eps') or 0)))[:max_rows]
 
     has_date = bool(first_seen_map)
+    # 推導「今日」: 優先參數, 退到 date_str, 再退到 first_seen_map 最大值
+    if not today_str:
+        today_str = date_str
+    if not today_str and first_seen_map:
+        valid = [d for d in first_seen_map.values() if d and d != '—']
+        if valid:
+            today_str = max(valid)
 
     cols = [
         ('代號', 70, 'center'),
@@ -193,9 +206,17 @@ def render_releases_png(releases: list, title: str, out_path: str,
     # === 資料列 ===
     for r in rows:
         sc = r.get('score')
-        bg = _row_bg(sc)
-        fg = _row_text_color(sc)
-        font_used = f_body_bold if bg == COL_BG_HOT else f_body
+        # 今日剛公告 → 鮮綠蓋過 score 色 (最醒目)
+        sid_first_seen = first_seen_map.get(r.get('stock_id')) if has_date else None
+        is_today = bool(today_str and sid_first_seen == today_str)
+        if is_today:
+            bg = COL_BG_TODAY
+            fg = COL_TEXT_TODAY
+            font_used = f_body_bold
+        else:
+            bg = _row_bg(sc)
+            fg = _row_text_color(sc)
+            font_used = f_body_bold if bg == COL_BG_HOT else f_body
 
         draw.rectangle((pad_x, y, pad_x + table_w, y + row_h), fill=bg)
 
@@ -273,8 +294,9 @@ def render_releases_png(releases: list, title: str, out_path: str,
 
     # === Footer ===
     y += 6
+    today_hint = f' / 今日 {today_str} 公告 (鮮綠)' if today_str else ''
     foot_text = (f'共 {len(releases)} 檔 (顯示 top {len(rows)}).  '
-                 f'高度超預期 >=8 (鮮黃) / 有亮點 >=4 (暖橘) / 衰退 <=-4 (冷藍)')
+                 f'高度超預期 >=8 (鮮黃) / 有亮點 >=4 (暖橘) / 衰退 <=-4 (冷藍){today_hint}')
     foot_text = _strip_unrenderable(foot_text)
     draw.text((pad_x, y), foot_text, fill=COL_FOOTER, font=f_foot)
 

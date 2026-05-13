@@ -309,7 +309,7 @@ def run_daily(force_all: bool = False, scope: str = 'twse_tpex',
     first_seen_map = build_first_seen_map(SNAPSHOT_DIR, freshest_q, today_str=today_str)
     print(f'  掃 snapshots → 公告日期 dict: {len(first_seen_map)} 檔')
     build_report(today_str, releases, monthly_data, stats, str(excel_path),
-                 q_label=q_label, first_seen_map=first_seen_map)
+                 q_label=q_label, first_seen_map=first_seen_map, today_str=today_str)
     print(f'  產出: {excel_path} (當期: {q_label})')
 
     # 7. 發 Telegram (僅當有新公告)
@@ -339,6 +339,7 @@ def run_daily(force_all: bool = False, scope: str = 'twse_tpex',
                 date_str=today_str,
                 max_rows=30,
                 first_seen_map=first_seen_map,
+                today_str=today_str,
             )
             send_photo(token, chat_id, str(png_path),
                        caption=f'📸 {today_str} 今日新公告速覽')
@@ -364,7 +365,8 @@ def run_daily(force_all: bool = False, scope: str = 'twse_tpex',
                     date_str=today_str,
                     max_rows=30,
                     first_seen_map=first_seen_map,
-                    subtitle=f'評分降冪 top {min(30, len(won))} | 同日公告同色帶',
+                    today_str=today_str,
+                    subtitle=f'評分降冪 top {min(30, len(won))} | 今日公告鮮綠突顯',
                 )
                 send_photo(token, chat_id, str(won_png),
                            caption=f'🏆 一季賺贏全年明星 ({len(won)} 檔)')

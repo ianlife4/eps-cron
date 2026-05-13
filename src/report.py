@@ -26,7 +26,10 @@ FILL_HEADER = PatternFill('solid', start_color='2F5496')       # 欄位 header
 FILL_HIGHLIGHT = PatternFill('solid', start_color='FFD966')    # 鮮黃 — 重點列 (對齊 v3)
 FILL_HOT = PatternFill('solid', start_color='F8CBAD')          # 暖橘 — 次強調
 FILL_COLD = PatternFill('solid', start_color='B4C7E7')         # 冷藍 — 衰退警示
+FILL_TODAY = PatternFill('solid', start_color='98F098')        # 鮮綠 — 今日剛公告 (蓋過 score 色)
 FILL_BANNER = PatternFill('solid', start_color='DEEBF7')       # 淡藍底 — 區塊標題
+
+FONT_TODAY = Font(name='Microsoft JhengHei', bold=True, color='006600', size=10)
 
 ALIGN_CENTER = Alignment(horizontal='center', vertical='center')
 ALIGN_LEFT = Alignment(horizontal='left', vertical='center', indent=1)
@@ -313,10 +316,11 @@ def write_summary(ws, date_str: str, stats: dict, releases: list = None, q_label
 
 
 def write_releases(ws, releases: list, title: str = '今日新公告', title_fill: PatternFill = None,
-                   first_seen_map: dict = None):
+                   first_seen_map: dict = None, today_str: str = None):
     """新公告 / 完整 EPS / 高分 / 衰退 通用分頁 — 對齊 v3 視覺。
 
     若有 first_seen_map → 加「公告日期」欄, 同日期不同色帶。
+    今日剛公告 (first_seen == today_str) → 整列鮮綠, 蓋過 score 色, 最醒目。
     依分數降冪後, 同分內以 latest_eps 降冪做 tiebreak。
     """
     has_date = bool(first_seen_map)
@@ -388,6 +392,13 @@ def write_releases(ws, releases: list, title: str = '今日新公告', title_fil
         PatternFill('solid', start_color='F4E1F2'),  # 淡紫
         PatternFill('solid', start_color='D9D9D9'),  # 淺灰
     ]
+    # 推導「今日」: 優先 today_str 參數, 否則 first_seen_map 最大值
+    today_for_highlight = today_str
+    if not today_for_highlight and first_seen_map:
+        valid = [d for d in first_seen_map.values() if d and d != '—']
+        if valid:
+            today_for_highlight = max(valid)
+
     date_to_band = {}
     if has_date:
         unique_dates = sorted({first_seen_map.get(r.get('stock_id'), '—') for r in sorted_rows},
@@ -399,9 +410,17 @@ def write_releases(ws, releases: list, title: str = '今日新公告', title_fil
     date_col_idx = len(headers) if has_date else None
     for row_idx in range(3, ws.max_row + 1):
         score = ws.cell(row=row_idx, column=13).value
+        # 公告日期 value (放在最後欄)
+        first_date = ws.cell(row=row_idx, column=date_col_idx).value if date_col_idx else None
+        is_today = (first_date == today_for_highlight) if today_for_highlight else False
+
         fill = None
         font = FONT_BODY
-        if isinstance(score, (int, float)):
+        if is_today:
+            # 今日剛公告 → 整列鮮綠 (蓋過 score 色, 最醒目)
+            fill = FILL_TODAY
+            font = FONT_TODAY
+        elif isinstance(score, (int, float)):
             if score >= 8:
                 fill = FILL_HIGHLIGHT  # 鮮黃: 高度超預期
                 font = FONT_HIGHLIGHT
@@ -416,8 +435,8 @@ def write_releases(ws, releases: list, title: str = '今日新公告', title_fil
             cell.font = font
             cell.alignment = ALIGN_LEFT if c in (2, 15) else ALIGN_CENTER
             cell.border = BORDER
-        # 公告日期欄獨立色帶 (蓋過分數色, 讓同日視覺成群)
-        if date_col_idx is not None:
+        # 公告日期欄獨立色帶 (蓋過分數色, 讓同日視覺成群) — 但今日列已整列鮮綠, 不再重蓋
+        if date_col_idx is not None and not is_today:
             d_cell = ws.cell(row=row_idx, column=date_col_idx)
             d_val = d_cell.value
             band = date_to_band.get(d_val)
@@ -505,11 +524,13 @@ def _style_data_cell(cell, align=None, border=True, font=None):
 
 
 def write_won_full_year(ws, releases: list, q_label: str,
-                        first_seen_map: dict = None):
+                        first_seen_map: dict = None,
+                        today_str: str = None):
     """已贏全年確認名單 — 累計達成率 ≥ 100% 或 虧轉盈 (對應 v3「Q1贏全年確認名單」)
 
     排序: 評分 desc (主要), latest_eps desc (tiebreaker)
-    若有 first_seen_map → 加「公告日期」欄, 同日期用色帶區分
+    若有 first_seen_map → 加「公告日期」欄, 今日公告用鮮綠 (蓋過鮮黃 score 色)
+    today_str: 'YYYY-MM-DD'. 未傳則用 first_seen_map 最大日期.
     """
     prior_year = _prior_year(q_label)
     rows = [r for r in releases
@@ -568,9 +589,17 @@ def write_won_full_year(ws, releases: list, q_label: str,
             row_data.append(first_seen_map.get(sid, '—'))
         ws.append(row_data)
 
+    # 推導「今日」: 優先用 today_str 參數, 否則用 first_seen_map 最大日期
+    today_for_highlight = today_str
+    if not today_for_highlight and first_seen_map:
+        valid = [d for d in first_seen_map.values() if d and d != '—']
+        if valid:
+            today_for_highlight = max(valid)
+
     # 為每個獨特日期分配一個色帶 (同日同色, 不同日交替), 用較淡的色相區分
+    # 但「今日」這格特別用鮮綠突顯, 蓋過鮮黃
     date_palette = [
-        FILL_HIGHLIGHT,                              # 鮮黃 (今天 / 最新)
+        FILL_HIGHLIGHT,                              # 鮮黃 (非今日的次新日期)
         PatternFill('solid', start_color='FFEB9C'),  # 淡黃
         PatternFill('solid', start_color='FCE4D6'),  # 淡橘
         PatternFill('solid', start_color='E2EFDA'),  # 淡綠
@@ -579,24 +608,29 @@ def write_won_full_year(ws, releases: list, q_label: str,
     ]
     date_to_fill: dict = {}
     if has_date:
-        # 新→舊出現順序分配色 (rows 已按評分排了, 這裡用 date 去 dedup)
         unique_dates = []
         for r in rows:
             d = first_seen_map.get(r.get('stock_id'), '—')
             if d not in unique_dates:
                 unique_dates.append(d)
-        # 最新日期 (字典序最大) → 鮮黃, 之後依序給淡色
-        for i, d in enumerate(sorted(unique_dates, reverse=True)):
+        # 不包含今日的其他日期 → 套淡色 palette (新到舊)
+        non_today = sorted([d for d in unique_dates if d != today_for_highlight], reverse=True)
+        for i, d in enumerate(non_today):
             date_to_fill[d] = date_palette[i % len(date_palette)]
+        # 今日 → 鮮綠 (覆蓋, 確保最醒目)
+        if today_for_highlight:
+            date_to_fill[today_for_highlight] = FILL_TODAY
 
     for row_idx, r in enumerate(rows, start=4):
         sid = r.get('stock_id')
         first_date = first_seen_map.get(sid, '—') if has_date else None
+        is_today = (first_date == today_for_highlight) if today_for_highlight else False
         row_fill = date_to_fill.get(first_date, FILL_HIGHLIGHT) if has_date else FILL_HIGHLIGHT
+        row_font = FONT_TODAY if is_today else FONT_HIGHLIGHT
         for c in range(1, len(headers) + 1):
             cell = ws.cell(row=row_idx, column=c)
             cell.fill = row_fill
-            cell.font = FONT_HIGHLIGHT
+            cell.font = row_font
             cell.alignment = ALIGN_CENTER if c != 2 else ALIGN_LEFT
             cell.border = BORDER
 
@@ -751,7 +785,8 @@ def _detect_q_label(releases: list) -> str:
 
 
 def build_report(date_str: str, releases: list, monthly: list, stats: dict, out_path: str,
-                 q_label: str = None, first_seen_map: dict = None):
+                 q_label: str = None, first_seen_map: dict = None,
+                 today_str: str = None):
     """產出完整報告
 
     分頁順序 (v3 風格):
@@ -780,10 +815,13 @@ def build_report(date_str: str, releases: list, monthly: list, stats: dict, out_
     new_only = sorted([r for r in releases if r.get('is_new')],
                       key=lambda x: (-(x.get('score') if x.get('score') is not None else -99),
                                      -(x.get('latest_eps') or 0)))
+    # 今日參考: 優先 today_str 參數, 否則退到 date_str
+    today_for_highlight = today_str or date_str
+
     if new_only:
         ws_new = wb.create_sheet('今日新公告')
         write_releases(ws_new, new_only, f'🆕 今日新公告 ({len(new_only)} 檔)', FILL_TITLE_BLUE,
-                       first_seen_map=first_seen_map)
+                       first_seen_map=first_seen_map, today_str=today_for_highlight)
 
     # v3 風格三個 sheet — 都依 q_label 篩選
     if q_label:
@@ -791,7 +829,8 @@ def build_report(date_str: str, releases: list, monthly: list, stats: dict, out_
                if r.get('latest_quarter') == q_label and _is_won_full_year(r)]
         if won:
             ws_won = wb.create_sheet(f'{q_label}贏全年確認')
-            write_won_full_year(ws_won, releases, q_label, first_seen_map=first_seen_map)
+            write_won_full_year(ws_won, releases, q_label, first_seen_map=first_seen_map,
+                                today_str=today_for_highlight)
 
         cand = [r for r in releases
                 if r.get('latest_quarter') == q_label
@@ -814,7 +853,7 @@ def build_report(date_str: str, releases: list, monthly: list, stats: dict, out_
     if hot:
         ws_hot = wb.create_sheet('高分排行')
         write_releases(ws_hot, hot, f'🔥 高分排行 (評分 ≥ 4，{len(hot)} 檔)', FILL_TITLE_RED,
-                       first_seen_map=first_seen_map)
+                       first_seen_map=first_seen_map, today_str=today_for_highlight)
 
     # 衰退警示 (score ≤ -4)
     cold = sorted([r for r in releases if (r.get('score') or 0) <= -4],
@@ -822,7 +861,7 @@ def build_report(date_str: str, releases: list, monthly: list, stats: dict, out_
     if cold:
         ws_cold = wb.create_sheet('衰退警示')
         write_releases(ws_cold, cold, f'⚠️ 衰退警示 (評分 ≤ -4，{len(cold)} 檔)', FILL_TITLE_GOLD,
-                       first_seen_map=first_seen_map)
+                       first_seen_map=first_seen_map, today_str=today_for_highlight)
 
     # 完整 EPS
     full = sorted(releases,
@@ -830,7 +869,7 @@ def build_report(date_str: str, releases: list, monthly: list, stats: dict, out_
                                  -(x.get('latest_eps') or 0)))
     ws_full = wb.create_sheet('完整 EPS')
     write_releases(ws_full, full, f'📊 完整 EPS 全市場 ({len(full)} 檔)', FILL_TITLE_BLUE,
-                   first_seen_map=first_seen_map)
+                   first_seen_map=first_seen_map, today_str=today_for_highlight)
 
     # 月營收
     if monthly:

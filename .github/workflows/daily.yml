@@ -7,6 +7,10 @@ on:
     # 13:30 UTC = 21:30 TW (櫃買晚間公告補抓)
     - cron: '0 10 * * 1-5'
     - cron: '30 13 * * 1-5'
+  # 外部準時觸發 (Cloudflare Cron → repository_dispatch), 繞開 GHA schedule 排隊延遲。
+  # CF 在 22:00 TW 打這個 → GHA 立刻跑 → ~23:30 完成, 午夜前推 TG。
+  repository_dispatch:
+    types: [eps-run]
   workflow_dispatch:
     inputs:
       force_all:

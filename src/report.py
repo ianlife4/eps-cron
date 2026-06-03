@@ -802,9 +802,69 @@ def _detect_q_label(releases: list) -> str:
     return max(counter.items(), key=lambda kv: kv[1])[0]
 
 
+def write_self_reported(ws, records: list, title: str = '🆕 自結速報'):
+    """自結速報分頁 — 注意/處置股 + 自願自結 的每日自結數 (領先官方財報).
+
+    ⚠ 自結是「月 / 年初累計」非季資料, 與官方季 EPS 分流, 不進贏全年框架。
+    來源欄: 注意表 (注意/處置股統一表 regex) / AI (Claude 抽自由文字) / 規則 (科目表 regex)。
+    自結EPS 帶 * = 用自結淨利 ÷ 流通股數 自算 (原公告未直接給 EPS)。
+    """
+    headers = ['代號', '名稱', '類別', '期間', '自結EPS', 'EPS YoY',
+               '自結淨利(仟元)', '自結營收(仟元)', '公告日期', '來源']
+    _set_widths(ws, [9, 14, 9, 8, 10, 10, 15, 15, 12, 9])
+    _draw_title(ws, 1, title, len(headers), FILL_TITLE_BLUE, big=True)
+    for c, h in enumerate(headers, 1):
+        cell = ws.cell(row=2, column=c, value=h)
+        cell.font = FONT_HEADER
+        cell.fill = FILL_HEADER
+        cell.alignment = ALIGN_CENTER
+        cell.border = BORDER
+    ws.row_dimensions[2].height = 22
+
+    # 排序: 有自結EPS 的排前 (領先訊號最有價值), 再依 EPS 降冪; 純營收的殿後
+    records = sorted(records, key=lambda r: (r.get('eps') is not None,
+                                             r.get('eps') if r.get('eps') is not None else -999),
+                     reverse=True)
+    src_tag = {'regex_A': '注意表', 'haiku': 'AI', 'regex_B': '規則'}
+    for r in records:
+        eps = r.get('eps')
+        if eps is None:
+            eps_cell = '—'
+        else:
+            eps_cell = f'{eps}*' if str(r.get('eps_source', '')).endswith('computed') else eps
+        yoy = r.get('eps_yoy')
+        yoy_str = f'{yoy * 100:+.0f}%' if yoy is not None else '—'
+        ws.append([
+            r.get('stock_id'),
+            r.get('name', ''),
+            r.get('source_type', ''),
+            r.get('period_month', '') or '',
+            eps_cell,
+            yoy_str,
+            r.get('net_income'),
+            r.get('revenue'),
+            r.get('announce_date', ''),
+            src_tag.get(r.get('parse_method'), r.get('parse_method', '')),
+        ])
+
+    fill_by_src = {'注意股': FILL_HIGHLIGHT, '處置股': FILL_HOT, '自願自結': FILL_BANNER}
+    for row_idx in range(3, ws.max_row + 1):
+        fill = fill_by_src.get(ws.cell(row=row_idx, column=3).value)
+        for c in range(1, len(headers) + 1):
+            cell = ws.cell(row=row_idx, column=c)
+            if fill:
+                cell.fill = fill
+            cell.font = FONT_BODY
+            cell.alignment = ALIGN_LEFT if c == 2 else ALIGN_CENTER
+            cell.border = BORDER
+        for col_idx in (7, 8):
+            ws.cell(row=row_idx, column=col_idx).number_format = '#,##0'
+    ws.freeze_panes = 'C3'
+
+
 def build_report(date_str: str, releases: list, monthly: list, stats: dict, out_path: str,
                  q_label: str = None, first_seen_map: dict = None,
-                 today_str: str = None):
+                 today_str: str = None, self_reported: list = None):
     """產出完整報告
 
     分頁順序 (v3 風格):
@@ -889,6 +949,12 @@ def build_report(date_str: str, releases: list, monthly: list, stats: dict, out_
     ws_full = wb.create_sheet('完整 EPS')
     write_releases(ws_full, full, f'📊 完整 EPS 全市場 ({len(full)} 檔)', FILL_TITLE_BLUE,
                    first_seen_map=first_seen_map, today_str=today_for_highlight)
+
+    # 自結速報 (注意/處置股 + 自願自結 — 領先官方財報的自結數, 與官方季 EPS 分流)
+    if self_reported:
+        ws_sr = wb.create_sheet('自結速報')
+        write_self_reported(ws_sr, self_reported,
+                            title=f'🆕 自結速報 ({len(self_reported)} 檔, 領先官方財報)')
 
     # 月營收
     if monthly:

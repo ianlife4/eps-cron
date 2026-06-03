@@ -213,6 +213,26 @@ def run_daily(force_all: bool = False, scope: str = 'twse_tpex',
     except Exception as e:
         print(f'[3b] MOPS 補抓失敗 (不影響主流程): {e}')
 
+    # AI client — 供 [3c] 自結 Haiku 抽取 + [4b] 評分 共用 (只建一次)
+    use_ai = (not no_ai) and AI_AVAILABLE and bool(os.environ.get('ANTHROPIC_API_KEY'))
+    ai_model = os.environ.get('SCORE_MODEL', 'claude-haiku-4-5')
+    ai_client = anthropic.Anthropic(api_key=os.environ['ANTHROPIC_API_KEY']) if use_ai else None
+
+    # [3c] 自結速報 — 每日 自結/注意/處置股 財務揭露 (領先官方財報的自結數)
+    print('[3c] 自結速報掃描 (注意/處置股 + 自願自結)...')
+    self_reported = []
+    try:
+        from fetch_self_reported import fetch_self_reported_for_date
+        self_reported = fetch_self_reported_for_date(
+            today_str, ai_client=ai_client, model=ai_model, progress=True)
+        # 補名稱 (detail 抓不到時用 FinMind classifier)
+        for r in self_reported:
+            if not r.get('name'):
+                r['name'] = classifier.get(r['stock_id'], {}).get('name', '')
+        print(f'[3c] 自結速報 {len(self_reported)} 檔')
+    except Exception as e:
+        print(f'[3c] 自結速報失敗 (不影響主流程): {e}')
+
     new_set = detect_new_releases(eps_data, yesterday_eps if not force_all else {}, freshest_q)
     if force_all:
         print(f'[3] FORCE_ALL: 偵測到 {len(new_set)} 檔已公告 {freshest_q} 為最新一季')
@@ -238,10 +258,8 @@ def run_daily(force_all: bool = False, scope: str = 'twse_tpex',
     print(f'  分析 {len(releases)} 檔')
 
     # 5b. AI 評分 — 只跑「新公告 + 規則版預分數高/低」，避免 backfill 燒錢
-    use_ai = (not no_ai) and AI_AVAILABLE and os.environ.get('ANTHROPIC_API_KEY')
+    # (use_ai / ai_client / ai_model 已於 [3c] 前建好, 此處共用)
     if use_ai:
-        ai_client = anthropic.Anthropic(api_key=os.environ['ANTHROPIC_API_KEY'])
-        ai_model = os.environ.get('SCORE_MODEL', 'claude-haiku-4-5')
         # 篩選 AI 評分對象: 新公告中, 依規則版分數絕對值排序取 top N
         candidates = [r for r in releases if r.get('is_new')]
         candidates.sort(key=lambda x: -abs(x.get('score') or 0))
@@ -309,7 +327,8 @@ def run_daily(force_all: bool = False, scope: str = 'twse_tpex',
     first_seen_map = build_first_seen_map(SNAPSHOT_DIR, freshest_q, today_str=today_str)
     print(f'  掃 snapshots → 公告日期 dict: {len(first_seen_map)} 檔')
     build_report(today_str, releases, monthly_data, stats, str(excel_path),
-                 q_label=q_label, first_seen_map=first_seen_map, today_str=today_str)
+                 q_label=q_label, first_seen_map=first_seen_map, today_str=today_str,
+                 self_reported=self_reported)
     print(f'  產出: {excel_path} (當期: {q_label})')
 
     # 7. 發 Telegram (僅當有新公告)

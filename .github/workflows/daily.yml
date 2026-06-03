@@ -2,13 +2,13 @@ name: EPS Daily Cron
 
 on:
   schedule:
-    # UTC 時間 — 台灣 +8。
-    # 10:00 UTC = 18:00 TW (證交所收盤後第一波)
-    # 13:30 UTC = 21:30 TW (櫃買晚間公告補抓)
-    - cron: '0 10 * * 1-5'
-    - cron: '30 13 * * 1-5'
-  # 外部準時觸發 (Cloudflare Cron → repository_dispatch), 繞開 GHA schedule 排隊延遲。
-  # CF 在 22:00 TW 打這個 → GHA 立刻跑 → ~23:30 完成, 午夜前推 TG。
+    # 單次/日 — 私有 repo 免費 Actions 只有 2000 min/月; 原本雙跑 ~3960 min 會月底爆掉
+    # (5/28-5/29 就是額度爆 job 不啟動)。單跑 ~1980 min 壓回額度內。
+    # 用「冷門分鐘」避開 GHA 排程壅塞: 實測 :00 整點被延遲 8-9h, :30 只 0.5-2.4h。
+    # 12:07 UTC = 20:07 TW — 收盤後+當天多數自結已公告, 跑完約 22-23h, 通常午夜前。
+    - cron: '7 12 * * 1-5'
+  # 終極解 (保證午夜前、不看 GHA 排程臉色): Cloudflare Cron → repository_dispatch
+  # 在 22:00 TW 準時打這個 → GHA 立刻跑 (事件觸發, 秒開) → ~23:30 完成推 TG。
   repository_dispatch:
     types: [eps-run]
   workflow_dispatch:

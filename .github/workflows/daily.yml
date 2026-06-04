@@ -90,7 +90,9 @@ jobs:
             echo "✓ No changes (idempotent skip)"
           else
             git commit -m "📊 EPS daily $(date -u +'%Y-%m-%d %H:%M UTC')"
-            git push
+            # rebase 到最新 origin 再推, 避免 non-fast-forward 失敗 (6/3 run 失敗主因)
+            git pull --rebase -X theirs origin main || true
+            git push origin main
             echo "✓ Committed snapshot + report"
           fi
 

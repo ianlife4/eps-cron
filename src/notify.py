@@ -235,6 +235,39 @@ def format_daily_summary(date_str: str, new_releases: list, top_winners: list,
     return '\n'.join(lines)
 
 
+def format_self_reported_summary(date_str: str, records: list) -> str:
+    """自結速報 TG 摘要 (HTML)。注意/處置股月自結 + 自願自結，領先官方財報。
+
+    與官方季報分流: 這裡的 EPS 是「自結月/累計數」, 不是季報 EPS。
+    有自結EPS 的排前 (領先訊號最有價值), 純營收的殿後。
+    """
+    srt = sorted(records,
+                 key=lambda r: (r.get('eps') is not None,
+                                r.get('eps') if r.get('eps') is not None else -999),
+                 reverse=True)
+    lines = [f'<b>🆕 自結速報 {date_str}</b>（{len(records)} 檔）',
+             '<i>注意/處置股月自結 + 自願自結，領先官方財報</i>',
+             '━' * 12]
+    for r in srt[:20]:
+        sid = r.get('stock_id', '')
+        name = r.get('name', '')
+        cat = r.get('source_type', '')
+        eps = r.get('eps')
+        if eps is None:
+            eps_s = '自結EPS —'
+        else:
+            star = '*' if str(r.get('eps_source', '')).endswith('computed') else ''
+            eps_s = f'自結EPS {eps}{star}'
+        yoy = r.get('eps_yoy')
+        yoy_s = f' YoY{yoy * 100:+.0f}%' if yoy is not None else ''
+        lines.append(f'  <code>{sid}</code> {name}〔{cat}〕{eps_s}{yoy_s}')
+    if len(records) > 20:
+        lines.append(f'  …+{len(records) - 20} 檔（詳見 Excel「自結速報」分頁）')
+    lines.append('')
+    lines.append('<i>* = 自結淨利÷股數自算；為月/累計數，非季報</i>')
+    return '\n'.join(lines)
+
+
 if __name__ == '__main__':
     # 自測：發測試訊息
     import sys

@@ -31,7 +31,7 @@ from score import score_rule_based
 from report import build_report
 from notify import (send_message, send_document, send_photo, format_daily_summary,
                     format_self_reported_summary)
-from render_image import render_releases_png
+from render_image import render_releases_png, render_self_reported_png
 from fetch_mops import fetch_mops_supplement
 
 # AI 評分 (可選, 沒 API key 自動 fallback 到規則版)
@@ -408,15 +408,28 @@ def run_daily(force_all: bool = False, scope: str = 'twse_tpex',
         else:
             print('  (今日無新季報公告, 略過 EPS 摘要/PNG)')
 
-        # 7c. 自結速報 — 即使今天沒新季報也推 (領先訊號的重點)
+        # 7c. 自結速報 — 即使今天沒新季報也推 (領先訊號的重點): 文字摘要 + PNG 表格
         if self_reported:
             try:
                 send_message(token, chat_id,
                              format_self_reported_summary(today_str, self_reported))
                 time.sleep(1)
-                print(f'  ✓ 自結速報推送: {len(self_reported)} 檔')
+                print(f'  ✓ 自結速報文字推送: {len(self_reported)} 檔')
             except Exception as e:
-                print(f'  ⚠️ 自結摘要推送失敗 (略過): {e}')
+                print(f'  ⚠️ 自結摘要文字推送失敗 (略過): {e}')
+            try:
+                sr_png = REPORTS_DIR / f'eps_self_reported_{today_str}.png'
+                render_self_reported_png(
+                    self_reported,
+                    title=f'🆕 自結速報 ({len(self_reported)} 檔, 領先官方財報)',
+                    out_path=str(sr_png), date_str=today_str, max_rows=30,
+                )
+                send_photo(token, chat_id, str(sr_png),
+                           caption=f'📸 {today_str} 自結速報速覽 ({len(self_reported)} 檔)')
+                time.sleep(1)
+                print(f'  ✓ 自結速報 PNG 推送: {sr_png.name}')
+            except Exception as e:
+                print(f'  ⚠️ 自結 PNG 渲染/推送失敗 (略過, 不影響文字+Excel): {e}')
 
         # 7d. Excel 完整檔 (官方 EPS + 自結速報分頁) — 一律送
         send_document(token, chat_id, str(excel_path),

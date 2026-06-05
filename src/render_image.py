@@ -325,6 +325,107 @@ def render_releases_png(releases: list, title: str, out_path: str,
     return out_path
 
 
+def render_self_reported_png(records: list, title: str, out_path: str,
+                             date_str: str = '', max_rows: int = 30,
+                             subtitle: str = '') -> str:
+    """渲染自結速報為 PNG (TG 內嵌預覽)。
+
+    欄位: 代號 / 名稱 / 類別 / 期間 / 自結EPS / YoY% / 自結淨利(仟元) / 自結營收(仟元) / 來源
+    依類別上色: 注意股=鮮黃 / 處置股=暖橘 / 自願自結=淡藍 (對齊 Excel 自結速報分頁)。
+    有自結EPS 的排前 (領先訊號最有價值), 自結EPS 帶 * = 自結淨利÷股數自算。
+    """
+    rows = sorted(records,
+                  key=lambda r: (r.get('eps') is not None,
+                                 r.get('eps') if r.get('eps') is not None else -999),
+                  reverse=True)[:max_rows]
+    cat_bg = {'注意股': (255, 217, 102), '處置股': (248, 203, 173), '自願自結': (222, 235, 247)}
+    src_tag = {'regex_A': '注意表', 'haiku': 'AI', 'regex_B': '規則'}
+
+    cols = [
+        ('代號', 64, 'center'), ('名稱', 100, 'center'), ('類別', 74, 'center'),
+        ('期間', 54, 'center'), ('自結EPS', 82, 'center'), ('YoY%', 78, 'center'),
+        ('自結淨利(仟元)', 118, 'right'), ('自結營收(仟元)', 118, 'right'),
+        ('來源', 58, 'center'),
+    ]
+    pad_x, title_h, sub_h, header_h, row_h, foot_h = 16, 56, 28, 36, 30, 28
+    table_w = sum(c[1] for c in cols)
+    canvas_w = table_w + pad_x * 2
+    canvas_h = title_h + sub_h + header_h + row_h * max(1, len(rows)) + foot_h + pad_x
+
+    img = Image.new('RGB', (canvas_w, canvas_h), color=(255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    f_title = _load_font(20, bold=True)
+    f_sub = _load_font(13)
+    f_header = _load_font(14, bold=True)
+    f_body = _load_font(13)
+    f_foot = _load_font(11)
+
+    draw.rectangle((0, 0, canvas_w, title_h), fill=COL_TITLE_BG)
+    tc = _strip_unrenderable(title)
+    tw = draw.textlength(tc, font=f_title)
+    draw.text(((canvas_w - tw) / 2, (title_h - 22) / 2), tc, fill=COL_WHITE, font=f_title)
+
+    y = title_h
+    sub_text = _strip_unrenderable(subtitle or f'資料日期 {date_str} | MOPS 自結數，領先官方財報 (月/累計，非季報)')
+    draw.rectangle((0, y, canvas_w, y + sub_h), fill=(222, 235, 247))
+    sw = draw.textlength(sub_text, font=f_sub)
+    draw.text(((canvas_w - sw) / 2, y + 6), sub_text, fill=(31, 56, 100), font=f_sub)
+    y += sub_h
+
+    x = pad_x
+    draw.rectangle((pad_x, y, pad_x + table_w, y + header_h), fill=COL_HEADER_BG)
+    for label, w, _a in cols:
+        lw = draw.textlength(label, font=f_header)
+        draw.text((x + (w - lw) / 2, y + (header_h - 16) / 2), label, fill=COL_WHITE, font=f_header)
+        x += w
+    draw.line([(pad_x, y), (pad_x + table_w, y)], fill=COL_BORDER, width=1)
+    draw.line([(pad_x, y + header_h), (pad_x + table_w, y + header_h)], fill=COL_BORDER, width=1)
+    y += header_h
+
+    for r in rows:
+        bg = cat_bg.get(r.get('source_type', ''), COL_BG_ROW_A)
+        draw.rectangle((pad_x, y, pad_x + table_w, y + row_h), fill=bg)
+        eps = r.get('eps')
+        if eps is None:
+            eps_s = '—'
+        else:
+            eps_s = f'{eps}*' if str(r.get('eps_source', '')).endswith('computed') else f'{eps}'
+        yoy = r.get('eps_yoy')
+        yoy_s = f'{yoy * 100:+.0f}%' if yoy is not None else '—'
+        ni, rev = r.get('net_income'), r.get('revenue')
+        ni_s = f'{ni:,}' if isinstance(ni, (int, float)) else '—'
+        rev_s = f'{rev:,}' if isinstance(rev, (int, float)) else '—'
+        values = [
+            str(r.get('stock_id', '')), (r.get('name') or '')[:6],
+            r.get('source_type', ''), r.get('period_month') or '—',
+            eps_s, yoy_s, ni_s, rev_s,
+            src_tag.get(r.get('parse_method'), r.get('parse_method', '')),
+        ]
+        x = pad_x
+        for (cl, w, align), val in zip(cols, values):
+            txt = _strip_unrenderable(str(val))
+            vw = draw.textlength(txt, font=f_body)
+            tx = x + (w - vw) / 2 if align == 'center' else (x + w - vw - 6 if align == 'right' else x + 8)
+            draw.text((tx, y + (row_h - 16) / 2), txt, fill=COL_TEXT, font=f_body)
+            draw.line([(x, y), (x, y + row_h)], fill=COL_BORDER, width=1)
+            x += w
+        draw.line([(pad_x + table_w, y), (pad_x + table_w, y + row_h)], fill=COL_BORDER, width=1)
+        draw.line([(pad_x, y + row_h), (pad_x + table_w, y + row_h)], fill=COL_BORDER, width=1)
+        y += row_h
+
+    y += 6
+    n_att = sum(1 for r in records if r.get('source_type') == '注意股')
+    n_dis = sum(1 for r in records if r.get('source_type') == '處置股')
+    n_vol = sum(1 for r in records if r.get('source_type') == '自願自結')
+    foot = (f'共 {len(records)} 檔 (顯示 top {len(rows)}).  '
+            f'注意股 {n_att} (鮮黃) / 處置股 {n_dis} (暖橘) / 自願自結 {n_vol} (淡藍).  * = 自結淨利/股數自算')
+    draw.text((pad_x, y), _strip_unrenderable(foot), fill=COL_FOOTER, font=f_foot)
+
+    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+    img.save(out_path, format='PNG', optimize=True)
+    return out_path
+
+
 if __name__ == '__main__':
     sys.stdout.reconfigure(encoding='utf-8')
     sample = [

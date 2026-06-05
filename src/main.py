@@ -230,6 +230,19 @@ def run_daily(force_all: bool = False, scope: str = 'twse_tpex',
         for r in self_reported:
             if not r.get('name'):
                 r['name'] = classifier.get(r['stock_id'], {}).get('name', '')
+        # 自結評分 (AI 驚喜度, 與 EPS 同一套; 只評有自結EPS 的)
+        if ai_client and self_reported:
+            from score_ai import score_self_reported_one
+            scored = 0
+            for r in self_reported:
+                if r.get('eps') is None:
+                    continue
+                try:
+                    r.update(score_self_reported_one(ai_client, r, ai_model))
+                    scored += 1
+                except Exception as se:
+                    print(f'  [自結] {r.get("stock_id")} 評分失敗: {str(se)[:40]}')
+            print(f'[3c] 自結評分 {scored} 檔')
         print(f'[3c] 自結速報 {len(self_reported)} 檔')
     except Exception as e:
         print(f'[3c] 自結速報失敗 (不影響主流程): {e}')

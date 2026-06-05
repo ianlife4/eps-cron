@@ -203,6 +203,81 @@ def score_one(client: anthropic.Anthropic, analysis: dict, model: str) -> dict:
     }
 
 
+SELF_REPORTED_SYSTEM = """你是台股「自結損益」驚喜度評分專家。
+
+輸入是一檔公司的「月自結」財務資訊（自結 = 公司提前公布、未經會計師核閱的月/累計數字，領先官方季報）。
+請給 -9~+9 整數評分 + 一句話理由（≤15字）。
+
+## 評估重點
+- 月自結EPS 的 YoY（與去年同月比）：大幅成長=驚喜(+)，大幅衰退=反向驚喜(-)
+- 月自結EPS 由負轉正（轉虧為盈）= 強訊號（+5 起）；月自結EPS 為負 = 警示
+- 類別：
+  - 注意股/處置股 = 股價已大幅異動被列管；自結數強勁=基本面有撐（加分），疲弱/虧損=警示（扣分）
+  - 自願自結 = 公司主動提前釋出，通常偏多
+- 有參考季查核EPS 時，可比對月自結與季的方向是否一致
+
+## 級距
++8~9 高度超預期 | +6~7 值得關注 | +4~5 有亮點待觀察 | +1~3 符合預期 | 0 無特別資訊 | -1~-3 衰退警示 | -4~-6 明顯衰退 | -7~-9 嚴重衰退
+
+## 規則
+1. 這是「月」數據、波動大，評分比季報保守（同樣強度約降一級）
+2. 理由用中文一句話 ≤15字，例「月自結YoY+813%、注意股有撐」
+3. 嚴格按 JSON schema 輸出，不要 markdown
+"""
+
+
+def _format_self_reported_input(rec: dict) -> str:
+    eps = rec.get('eps')
+    yoy = rec.get('eps_yoy')
+    yoy_s = f'{yoy * 100:+.0f}%' if yoy is not None else 'N/A'
+    parts = [
+        f"代號 {rec.get('stock_id', '')} {rec.get('name', '')}",
+        f"類別: {rec.get('source_type', '')}",
+        f"期間: {rec.get('period_month') or 'N/A'}",
+        f"月自結EPS: {eps} (YoY {yoy_s})",
+    ]
+    if rec.get('eps_quarter') is not None:
+        parts.append(f"參考季查核EPS: {rec['eps_quarter']}")
+    if rec.get('net_income') is not None:
+        parts.append(f"月自結淨利(仟元): {rec['net_income']}")
+    if rec.get('revenue') is not None:
+        parts.append(f"月自結營收(仟元): {rec['revenue']}")
+    return '\n'.join(parts)
+
+
+def score_self_reported_one(client: anthropic.Anthropic, rec: dict, model: str) -> dict:
+    """自結記錄評分（與 EPS 同一套驚喜度，但月自結視角）。
+    回傳 {score, level, reasons, label, ai}。沒有自結EPS 的不評（回 None）。
+    """
+    if rec.get('eps') is None:
+        return {'score': None, 'level': '—', 'reasons': '', 'label': '—', 'ai': False}
+    response = client.messages.parse(
+        model=model, max_tokens=200,
+        system=[{'type': 'text', 'text': SELF_REPORTED_SYSTEM,
+                 'cache_control': {'type': 'ephemeral'}}],
+        messages=[{'role': 'user',
+                   'content': f'請評分以下自結資料：\n\n{_format_self_reported_input(rec)}'}],
+        output_format=ScoreOutput,
+    )
+    p: ScoreOutput = response.parsed_output
+    score = p.score
+    if score >= 8:
+        label = f'🔥 +{score}'
+    elif score >= 6:
+        label = f'⭐ +{score}'
+    elif score >= 4:
+        label = f'✨ +{score}'
+    elif score >= 1:
+        label = f'➕ +{score}'
+    elif score == 0:
+        label = '➖ 0'
+    elif score >= -3:
+        label = f'⚠️ {score}'
+    else:
+        label = f'🔻 {score}'
+    return {'score': score, 'level': p.level, 'reasons': p.reasons, 'label': label, 'ai': True}
+
+
 def score_batch(analyses: list, api_key: Optional[str] = None,
                 model: Optional[str] = None, progress: bool = True) -> list:
     """批次評分。傳回 list of {score, level, reasons, label, ai, _usage}."""

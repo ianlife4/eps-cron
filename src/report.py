@@ -809,9 +809,9 @@ def write_self_reported(ws, records: list, title: str = '🆕 自結速報'):
     來源欄: 注意表 (注意/處置股統一表 regex) / AI (Claude 抽自由文字) / 規則 (科目表 regex)。
     自結EPS 帶 * = 用自結淨利 ÷ 流通股數 自算 (原公告未直接給 EPS)。
     """
-    headers = ['代號', '名稱', '類別', '期間', '自結EPS', 'EPS YoY',
+    headers = ['代號', '名稱', '類別', '期間', '自結EPS', 'EPS YoY', '評分', '級別', '評分理由',
                '自結淨利(仟元)', '自結營收(仟元)', '公告日期', '來源']
-    _set_widths(ws, [9, 14, 9, 8, 10, 10, 15, 15, 12, 9])
+    _set_widths(ws, [9, 13, 9, 7, 10, 9, 6, 12, 38, 15, 15, 12, 9])
     _draw_title(ws, 1, title, len(headers), FILL_TITLE_BLUE, big=True)
     for c, h in enumerate(headers, 1):
         cell = ws.cell(row=2, column=c, value=h)
@@ -821,8 +821,8 @@ def write_self_reported(ws, records: list, title: str = '🆕 自結速報'):
         cell.border = BORDER
     ws.row_dimensions[2].height = 22
 
-    # 排序: 有自結EPS 的排前 (領先訊號最有價值), 再依 EPS 降冪; 純營收的殿後
-    records = sorted(records, key=lambda r: (r.get('eps') is not None,
+    # 排序: 依評分降冪 (同 EPS 表), 再依自結EPS; 無評分(純營收)殿後
+    records = sorted(records, key=lambda r: (r.get('score') if r.get('score') is not None else -99,
                                              r.get('eps') if r.get('eps') is not None else -999),
                      reverse=True)
     src_tag = {'regex_A': '注意表', 'haiku': 'AI', 'regex_B': '規則'}
@@ -834,6 +834,7 @@ def write_self_reported(ws, records: list, title: str = '🆕 自結速報'):
             eps_cell = f'{eps}*' if str(r.get('eps_source', '')).endswith('computed') else eps
         yoy = r.get('eps_yoy')
         yoy_str = f'{yoy * 100:+.0f}%' if yoy is not None else '—'
+        sc = r.get('score')
         ws.append([
             r.get('stock_id'),
             r.get('name', ''),
@@ -841,23 +842,34 @@ def write_self_reported(ws, records: list, title: str = '🆕 自結速報'):
             r.get('period_month', '') or '',
             eps_cell,
             yoy_str,
+            sc if sc is not None else '—',
+            r.get('level') or '—',
+            _format_reasons(r.get('reasons')),
             r.get('net_income'),
             r.get('revenue'),
             r.get('announce_date', ''),
             src_tag.get(r.get('parse_method'), r.get('parse_method', '')),
         ])
 
-    fill_by_src = {'注意股': FILL_HIGHLIGHT, '處置股': FILL_HOT, '自願自結': FILL_BANNER}
+    def _score_fill(s):
+        if isinstance(s, (int, float)):
+            if s >= 8:
+                return FILL_HIGHLIGHT
+            if s >= 4:
+                return FILL_HOT
+            if s <= -4:
+                return FILL_COLD
+        return None
     for row_idx in range(3, ws.max_row + 1):
-        fill = fill_by_src.get(ws.cell(row=row_idx, column=3).value)
+        fill = _score_fill(ws.cell(row=row_idx, column=7).value)
         for c in range(1, len(headers) + 1):
             cell = ws.cell(row=row_idx, column=c)
             if fill:
                 cell.fill = fill
             cell.font = FONT_BODY
-            cell.alignment = ALIGN_LEFT if c == 2 else ALIGN_CENTER
+            cell.alignment = ALIGN_LEFT if c in (2, 9) else ALIGN_CENTER
             cell.border = BORDER
-        for col_idx in (7, 8):
+        for col_idx in (10, 11):
             ws.cell(row=row_idx, column=col_idx).number_format = '#,##0'
     ws.freeze_panes = 'C3'
 

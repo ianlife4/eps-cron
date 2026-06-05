@@ -242,7 +242,7 @@ def format_self_reported_summary(date_str: str, records: list) -> str:
     有自結EPS 的排前 (領先訊號最有價值), 純營收的殿後。
     """
     srt = sorted(records,
-                 key=lambda r: (r.get('eps') is not None,
+                 key=lambda r: (r.get('score') if r.get('score') is not None else -99,
                                 r.get('eps') if r.get('eps') is not None else -999),
                  reverse=True)
     lines = [f'<b>🆕 自結速報 {date_str}</b>（{len(records)} 檔）',
@@ -254,17 +254,21 @@ def format_self_reported_summary(date_str: str, records: list) -> str:
         cat = r.get('source_type', '')
         eps = r.get('eps')
         if eps is None:
-            eps_s = '自結EPS —'
+            eps_s = 'EPS —'
         else:
             star = '*' if str(r.get('eps_source', '')).endswith('computed') else ''
-            eps_s = f'自結EPS {eps}{star}'
+            eps_s = f'EPS {eps}{star}'
         yoy = r.get('eps_yoy')
         yoy_s = f' YoY{yoy * 100:+.0f}%' if yoy is not None else ''
-        lines.append(f'  <code>{sid}</code> {name}〔{cat}〕{eps_s}{yoy_s}')
+        label = r.get('label', '')
+        label_s = f' {label}' if label and label != '—' else ''
+        reasons = r.get('reasons')
+        reason_s = f' — {reasons}' if isinstance(reasons, str) and reasons else ''
+        lines.append(f'  <code>{sid}</code> {name}〔{cat}〕{eps_s}{yoy_s}{label_s}{reason_s}')
     if len(records) > 20:
         lines.append(f'  …+{len(records) - 20} 檔（詳見 Excel「自結速報」分頁）')
     lines.append('')
-    lines.append('<i>* = 自結淨利÷股數自算；為月/累計數，非季報</i>')
+    lines.append('<i>評分 = Claude 月自結驚喜度 -9~+9；* = 自結淨利÷股數自算；月/累計數非季報</i>')
     return '\n'.join(lines)
 
 

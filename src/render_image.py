@@ -330,22 +330,19 @@ def render_self_reported_png(records: list, title: str, out_path: str,
                              subtitle: str = '') -> str:
     """渲染自結速報為 PNG (TG 內嵌預覽)。
 
-    欄位: 代號 / 名稱 / 類別 / 期間 / 自結EPS / YoY% / 自結淨利(仟元) / 自結營收(仟元) / 來源
-    依類別上色: 注意股=鮮黃 / 處置股=暖橘 / 自願自結=淡藍 (對齊 Excel 自結速報分頁)。
-    有自結EPS 的排前 (領先訊號最有價值), 自結EPS 帶 * = 自結淨利÷股數自算。
+    欄位: 代號 / 名稱 / 類別 / 期間 / 自結EPS / YoY% / 評分 / 級別 / 評分理由
+    依評分上色 (同 EPS 表): >=8 鮮黃 / >=4 暖橘 / <=-4 冷藍。依評分降冪排序。
+    自結EPS 帶 * = 自結淨利÷股數自算; 無自結EPS (純營收) 不評分、殿後。
     """
     rows = sorted(records,
-                  key=lambda r: (r.get('eps') is not None,
+                  key=lambda r: (r.get('score') if r.get('score') is not None else -99,
                                  r.get('eps') if r.get('eps') is not None else -999),
                   reverse=True)[:max_rows]
-    cat_bg = {'注意股': (255, 217, 102), '處置股': (248, 203, 173), '自願自結': (222, 235, 247)}
-    src_tag = {'regex_A': '注意表', 'haiku': 'AI', 'regex_B': '規則'}
 
     cols = [
-        ('代號', 64, 'center'), ('名稱', 100, 'center'), ('類別', 74, 'center'),
-        ('期間', 54, 'center'), ('自結EPS', 82, 'center'), ('YoY%', 78, 'center'),
-        ('自結淨利(仟元)', 118, 'right'), ('自結營收(仟元)', 118, 'right'),
-        ('來源', 58, 'center'),
+        ('代號', 62, 'center'), ('名稱', 92, 'center'), ('類別', 72, 'center'),
+        ('期間', 50, 'center'), ('自結EPS', 80, 'center'), ('YoY%', 76, 'center'),
+        ('評分', 56, 'center'), ('級別', 96, 'center'), ('評分理由', 300, 'left'),
     ]
     pad_x, title_h, sub_h, header_h, row_h, foot_h = 16, 56, 28, 36, 30, 28
     table_w = sum(c[1] for c in cols)
@@ -358,6 +355,7 @@ def render_self_reported_png(records: list, title: str, out_path: str,
     f_sub = _load_font(13)
     f_header = _load_font(14, bold=True)
     f_body = _load_font(13)
+    f_body_bold = _load_font(13, bold=True)
     f_foot = _load_font(11)
 
     draw.rectangle((0, 0, canvas_w, title_h), fill=COL_TITLE_BG)
@@ -366,7 +364,7 @@ def render_self_reported_png(records: list, title: str, out_path: str,
     draw.text(((canvas_w - tw) / 2, (title_h - 22) / 2), tc, fill=COL_WHITE, font=f_title)
 
     y = title_h
-    sub_text = _strip_unrenderable(subtitle or f'資料日期 {date_str} | MOPS 自結數，領先官方財報 (月/累計，非季報)')
+    sub_text = _strip_unrenderable(subtitle or f'資料日期 {date_str} | MOPS 自結數 + Claude 評分，領先官方財報 (月/累計，非季報)')
     draw.rectangle((0, y, canvas_w, y + sub_h), fill=(222, 235, 247))
     sw = draw.textlength(sub_text, font=f_sub)
     draw.text(((canvas_w - sw) / 2, y + 6), sub_text, fill=(31, 56, 100), font=f_sub)
@@ -383,7 +381,10 @@ def render_self_reported_png(records: list, title: str, out_path: str,
     y += header_h
 
     for r in rows:
-        bg = cat_bg.get(r.get('source_type', ''), COL_BG_ROW_A)
+        sc = r.get('score')
+        bg = _row_bg(sc)
+        fg = _row_text_color(sc)
+        font_used = f_body_bold if bg == COL_BG_HOT else f_body
         draw.rectangle((pad_x, y, pad_x + table_w, y + row_h), fill=bg)
         eps = r.get('eps')
         if eps is None:
@@ -392,21 +393,26 @@ def render_self_reported_png(records: list, title: str, out_path: str,
             eps_s = f'{eps}*' if str(r.get('eps_source', '')).endswith('computed') else f'{eps}'
         yoy = r.get('eps_yoy')
         yoy_s = f'{yoy * 100:+.0f}%' if yoy is not None else '—'
-        ni, rev = r.get('net_income'), r.get('revenue')
-        ni_s = f'{ni:,}' if isinstance(ni, (int, float)) else '—'
-        rev_s = f'{rev:,}' if isinstance(rev, (int, float)) else '—'
+        reasons = r.get('reasons')
+        reasons_s = reasons if isinstance(reasons, str) else (
+            '、'.join(str(x) for x in reasons[:2]) if isinstance(reasons, list) else '')
         values = [
             str(r.get('stock_id', '')), (r.get('name') or '')[:6],
             r.get('source_type', ''), r.get('period_month') or '—',
-            eps_s, yoy_s, ni_s, rev_s,
-            src_tag.get(r.get('parse_method'), r.get('parse_method', '')),
+            eps_s, yoy_s,
+            f'{sc}' if sc is not None else '—',
+            r.get('level') or '—',
+            reasons_s,
         ]
         x = pad_x
-        for (cl, w, align), val in zip(cols, values):
+        for (col_label, w, align), val in zip(cols, values):
             txt = _strip_unrenderable(str(val))
-            vw = draw.textlength(txt, font=f_body)
+            max_chars = max(1, int(w / 14))
+            if len(txt) > max_chars and col_label == '評分理由':
+                txt = txt[:max_chars] + '…'
+            vw = draw.textlength(txt, font=font_used)
             tx = x + (w - vw) / 2 if align == 'center' else (x + w - vw - 6 if align == 'right' else x + 8)
-            draw.text((tx, y + (row_h - 16) / 2), txt, fill=COL_TEXT, font=f_body)
+            draw.text((tx, y + (row_h - 16) / 2), txt, fill=fg, font=font_used)
             draw.line([(x, y), (x, y + row_h)], fill=COL_BORDER, width=1)
             x += w
         draw.line([(pad_x + table_w, y), (pad_x + table_w, y + row_h)], fill=COL_BORDER, width=1)
@@ -417,8 +423,8 @@ def render_self_reported_png(records: list, title: str, out_path: str,
     n_att = sum(1 for r in records if r.get('source_type') == '注意股')
     n_dis = sum(1 for r in records if r.get('source_type') == '處置股')
     n_vol = sum(1 for r in records if r.get('source_type') == '自願自結')
-    foot = (f'共 {len(records)} 檔 (顯示 top {len(rows)}).  '
-            f'注意股 {n_att} (鮮黃) / 處置股 {n_dis} (暖橘) / 自願自結 {n_vol} (淡藍).  * = 自結淨利/股數自算')
+    foot = (f'共 {len(records)} 檔 (注意股 {n_att} / 處置股 {n_dis} / 自願自結 {n_vol}, 顯示 top {len(rows)}).  '
+            f'評分: >=8 鮮黃 / >=4 暖橘 / <=-4 冷藍.  * = 自結淨利/股數自算')
     draw.text((pad_x, y), _strip_unrenderable(foot), fill=COL_FOOTER, font=f_foot)
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)

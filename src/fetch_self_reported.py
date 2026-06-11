@@ -32,7 +32,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 from fetch_mops import _new_session, MOPS_BASE  # noqa: E402
 
 # 搜尋關鍵字 → 預設 source_type (主旨還會再細分)
-KEYWORDS = ['自結', '注意交易資訊', '處置交易資訊']
+# 注意/處置股揭露的主旨用語不一致: 上市常見「達公布注意交易資訊標準」, 上櫃常見「達公布注意標準」。
+# → 用較短的「注意」「處置」涵蓋兩種寫法 (原本只抓「注意交易資訊」漏掉全部上櫃注意股, 如 4931 新盛力)。
+# 非自結的「注意」雜訊 (如可轉債價格注意) 由明細解析過濾 (無自結表 → eps=None → 丟棄)。
+KEYWORDS = ['自結', '注意', '處置']
 # 市場別由 t51sb10 的 KIND 參數控制 (TYPEK 被忽略):
 #   L=上市(sii) / O=上櫃(otc) / R=興櫃(rotc). 實測補正: 原本兩組都用 L → 漏抓上櫃.
 MARKET_KINDS = ['L', 'O', 'R']

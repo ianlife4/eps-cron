@@ -1,8 +1,8 @@
 name: EPS Daily Cron
 
 on:
-  # 由 Cloudflare Cron 準時觸發 (eps-cron-trigger Worker, 22:00 TW = "0 14 * * 1-5")
-  # → repository_dispatch → GHA 秒開, 不再被 GHA schedule 排隊拖 ~4h 到半夜。2026-06-15 起。
+  # 由 Cloudflare Cron 準時觸發 (eps-cron-trigger Worker, 19:30 TW = "30 11 * * 1-5")
+  # → repository_dispatch → GHA 秒開, 跑 ~100min → ~21:10 TW 完成發送 (22:00 前)。2026-06-15 起。
   # (原 schedule cron '7 12 * * 1-5' 已移除; 若 CF 失效要回退, 把它加回 on: 即可。)
   repository_dispatch:
     types: [eps-run]

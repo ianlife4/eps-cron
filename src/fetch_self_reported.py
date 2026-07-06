@@ -413,6 +413,10 @@ def fetch_self_reported_for_date(date_ad: str, ai_client=None, model: Optional[s
                     rec['eps_shares_used'] = shares
             except Exception:
                 pass
+        # 只收「有自結EPS (公告直接給 或 用自結淨利自算)」的 →
+        # 純「自結營收」公告 (無損益/EPS, 與「月營收」分頁重複) 不進速報, 避免整列空白。
+        if rec.get('eps') is None:
+            continue
         records.append(rec)
     if progress:
         print(f'  [自結] 解析出 {len(records)} 筆有效自結資料')

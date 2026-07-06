@@ -313,7 +313,9 @@ def parse_template_b(text: str) -> dict:
 
 
 def _is_template_a(text: str) -> bool:
-    return ('最近一月' in text and '最近一季' in text) or '合併自結數' in text
+    # 注意/處置股統一表表頭「最近一(個)月 … 最近一季」; 有的公司寫「最近一月」、有的寫「最近一個月」。
+    return (re.search(r'最近一\s*個?\s*月', text) is not None and '最近一季' in text) \
+           or '合併自結數' in text
 
 
 def _meaningful(parsed: dict) -> bool:

@@ -340,9 +340,11 @@ def render_self_reported_png(records: list, title: str, out_path: str,
                   reverse=True)[:max_rows]
 
     cols = [
-        ('代號', 62, 'center'), ('名稱', 92, 'center'), ('類別', 72, 'center'),
-        ('期間', 50, 'center'), ('自結EPS', 80, 'center'), ('YoY%', 76, 'center'),
-        ('評分', 56, 'center'), ('級別', 96, 'center'), ('評分理由', 300, 'left'),
+        ('代號', 60, 'center'), ('名稱', 86, 'center'), ('類別', 70, 'center'),
+        ('期間', 48, 'center'), ('自結EPS', 74, 'center'), ('YoY%', 66, 'center'),
+        ('評分', 48, 'center'), ('級別', 86, 'center'),
+        ('淨利(仟元)', 100, 'right'), ('營收(仟元)', 100, 'right'),
+        ('評分理由', 236, 'left'),
     ]
     pad_x, title_h, sub_h, header_h, row_h, foot_h = 16, 56, 28, 36, 30, 28
     table_w = sum(c[1] for c in cols)
@@ -396,12 +398,16 @@ def render_self_reported_png(records: list, title: str, out_path: str,
         reasons = r.get('reasons')
         reasons_s = reasons if isinstance(reasons, str) else (
             '、'.join(str(x) for x in reasons[:2]) if isinstance(reasons, list) else '')
+        ni, rev = r.get('net_income'), r.get('revenue')
+        ni_s = f'{ni:,}' if isinstance(ni, (int, float)) else '—'
+        rev_s = f'{rev:,}' if isinstance(rev, (int, float)) else '—'
         values = [
             str(r.get('stock_id', '')), (r.get('name') or '')[:6],
             r.get('source_type', ''), r.get('period_month') or '—',
             eps_s, yoy_s,
             f'{sc}' if sc is not None else '—',
             r.get('level') or '—',
+            ni_s, rev_s,
             reasons_s,
         ]
         x = pad_x

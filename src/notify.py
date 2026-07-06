@@ -254,7 +254,8 @@ def format_self_reported_summary(date_str: str, records: list) -> str:
         cat = r.get('source_type', '')
         eps = r.get('eps')
         if eps is None:
-            eps_s = 'EPS —'
+            rev = r.get('revenue')
+            eps_s = f'自結營收 {rev:,}仟' if isinstance(rev, (int, float)) else 'EPS —'
         else:
             star = '*' if str(r.get('eps_source', '')).endswith('computed') else ''
             eps_s = f'EPS {eps}{star}'

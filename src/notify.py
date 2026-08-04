@@ -265,11 +265,12 @@ def format_self_reported_summary(date_str: str, records: list) -> str:
         label_s = f' {label}' if label and label != '—' else ''
         reasons = r.get('reasons')
         reason_s = f' — {reasons}' if isinstance(reasons, str) and reasons else ''
-        lines.append(f'  <code>{sid}</code> {name}〔{cat}〕{eps_s}{yoy_s}{label_s}{reason_s}')
+        fut_mark = ' ⚡' if r.get('has_futures') else ''
+        lines.append(f'  <code>{sid}</code> {name}{fut_mark}〔{cat}〕{eps_s}{yoy_s}{label_s}{reason_s}')
     if len(records) > 20:
         lines.append(f'  …+{len(records) - 20} 檔（詳見 Excel「自結速報」分頁）')
     lines.append('')
-    lines.append('<i>評分 = Claude 月自結驚喜度 -9~+9；* = 自結淨利÷股數自算；月/累計數非季報</i>')
+    lines.append('<i>⚡ = 有個股期貨(可做空/槓桿)；評分 = Claude 月自結驚喜度 -9~+9；* = 自結淨利÷股數自算；月/累計數非季報</i>')
     return '\n'.join(lines)
 
 

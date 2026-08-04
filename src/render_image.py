@@ -340,11 +340,11 @@ def render_self_reported_png(records: list, title: str, out_path: str,
                   reverse=True)[:max_rows]
 
     cols = [
-        ('代號', 60, 'center'), ('名稱', 86, 'center'), ('類別', 70, 'center'),
-        ('期間', 48, 'center'), ('自結EPS', 74, 'center'), ('YoY%', 66, 'center'),
-        ('評分', 48, 'center'), ('級別', 86, 'center'),
-        ('淨利(仟元)', 100, 'right'), ('營收(仟元)', 100, 'right'),
-        ('評分理由', 236, 'left'),
+        ('代號', 60, 'center'), ('名稱', 84, 'center'), ('股期', 42, 'center'),
+        ('類別', 68, 'center'), ('期間', 46, 'center'), ('自結EPS', 72, 'center'), ('YoY%', 64, 'center'),
+        ('評分', 46, 'center'), ('級別', 84, 'center'),
+        ('淨利(仟元)', 98, 'right'), ('營收(仟元)', 98, 'right'),
+        ('評分理由', 200, 'left'),
     ]
     pad_x, title_h, sub_h, header_h, row_h, foot_h = 16, 56, 28, 36, 30, 28
     table_w = sum(c[1] for c in cols)
@@ -403,6 +403,7 @@ def render_self_reported_png(records: list, title: str, out_path: str,
         rev_s = f'{rev:,}' if isinstance(rev, (int, float)) else '—'
         values = [
             str(r.get('stock_id', '')), (r.get('name') or '')[:6],
+            '●' if r.get('has_futures') else '',
             r.get('source_type', ''), r.get('period_month') or '—',
             eps_s, yoy_s,
             f'{sc}' if sc is not None else '—',
@@ -429,8 +430,9 @@ def render_self_reported_png(records: list, title: str, out_path: str,
     n_att = sum(1 for r in records if r.get('source_type') == '注意股')
     n_dis = sum(1 for r in records if r.get('source_type') == '處置股')
     n_vol = sum(1 for r in records if r.get('source_type') == '自願自結')
+    n_fut = sum(1 for r in records if r.get('has_futures'))
     foot = (f'共 {len(records)} 檔 (注意股 {n_att} / 處置股 {n_dis} / 自願自結 {n_vol}, 顯示 top {len(rows)}).  '
-            f'評分: >=8 鮮黃 / >=4 暖橘 / <=-4 冷藍.  * = 自結淨利/股數自算')
+            f'評分: >=8 鮮黃 / >=4 暖橘 / <=-4 冷藍.  ● = 有股期({n_fut}檔, 可做空/槓桿).  * = 自結淨利/股數自算')
     draw.text((pad_x, y), _strip_unrenderable(foot), fill=COL_FOOTER, font=f_foot)
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)

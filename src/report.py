@@ -810,8 +810,8 @@ def write_self_reported(ws, records: list, title: str = '🆕 自結速報'):
     自結EPS 帶 * = 用自結淨利 ÷ 流通股數 自算 (原公告未直接給 EPS)。
     """
     headers = ['代號', '名稱', '類別', '期間', '自結EPS', 'EPS YoY', '評分', '級別', '評分理由',
-               '自結淨利(仟元)', '自結營收(仟元)', '公告日期', '來源']
-    _set_widths(ws, [9, 13, 9, 7, 10, 9, 6, 12, 38, 15, 15, 12, 9])
+               '自結淨利(仟元)', '自結營收(仟元)', '公告日期', '來源', '股期']
+    _set_widths(ws, [9, 13, 9, 7, 10, 9, 6, 12, 38, 15, 15, 12, 9, 6])
     _draw_title(ws, 1, title, len(headers), FILL_TITLE_BLUE, big=True)
     for c, h in enumerate(headers, 1):
         cell = ws.cell(row=2, column=c, value=h)
@@ -849,6 +849,7 @@ def write_self_reported(ws, records: list, title: str = '🆕 自結速報'):
             r.get('revenue'),
             r.get('announce_date', ''),
             src_tag.get(r.get('parse_method'), r.get('parse_method', '')),
+            '✔' if r.get('has_futures') else '',
         ])
 
     def _score_fill(s):

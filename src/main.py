@@ -243,6 +243,15 @@ def run_daily(force_all: bool = False, scope: str = 'twse_tpex',
                 except Exception as se:
                     print(f'  [自結] {r.get("stock_id")} 評分失敗: {str(se)[:40]}')
             print(f'[3c] 自結評分 {scored} 檔')
+        # 標記有個股期貨的 (可做空/加槓桿, 較好操作) — 來源 TAIFEX stockLists
+        try:
+            from futures_list import fetch_stock_futures_set
+            _fut = fetch_stock_futures_set()
+            for r in self_reported:
+                r['has_futures'] = r.get('stock_id') in _fut
+            print(f'[3c] 股期標記: {sum(1 for r in self_reported if r.get("has_futures"))} 檔有股期')
+        except Exception as e:
+            print(f'[3c] 股期標記失敗 (略過): {e}')
         print(f'[3c] 自結速報 {len(self_reported)} 檔')
     except Exception as e:
         print(f'[3c] 自結速報失敗 (不影響主流程): {e}')

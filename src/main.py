@@ -349,6 +349,16 @@ def run_daily(force_all: bool = False, scope: str = 'twse_tpex',
     # 掃 snapshots 算 first_seen (此時 today 的 snapshot 已存好, 包含今天剛公告的)
     first_seen_map = build_first_seen_map(SNAPSHOT_DIR, freshest_q, today_str=today_str)
     print(f'  掃 snapshots → 公告日期 dict: {len(first_seen_map)} 檔')
+    # 股期標記 (releases + 月營收 也標; self_reported 已在 [3c] 標過) — 全系列報表通用
+    try:
+        from futures_list import fetch_stock_futures_set
+        _futset = fetch_stock_futures_set()
+        for _r in releases:
+            _r['has_futures'] = _r.get('stock_id') in _futset
+        for _r in monthly_data:
+            _r['has_futures'] = _r.get('stock_id') in _futset
+    except Exception as _e:
+        print(f'  股期標記 (releases/月營收) 失敗 (略過): {_e}')
     build_report(today_str, releases, monthly_data, stats, str(excel_path),
                  q_label=q_label, first_seen_map=first_seen_map, today_str=today_str,
                  self_reported=self_reported)

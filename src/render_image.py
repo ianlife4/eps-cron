@@ -151,19 +151,20 @@ def render_releases_png(releases: list, title: str, out_path: str,
             today_str = max(valid)
 
     cols = [
-        ('代號', 70, 'center'),
-        ('名稱', 105, 'center'),
-        ('季', 75, 'center'),
-        ('EPS', 70, 'center'),
-        ('去年同季', 80, 'center'),
-        ('YoY%', 85, 'center'),
-        ('去年全年', 85, 'center'),  # NEW: Q1 vs 去年全年 EPS
-        ('達成率', 78, 'center'),
-        ('倍數', 65, 'center'),      # NEW: Q1 / 去年全年, 直觀
-        ('QoQ%', 80, 'center'),
-        ('評分', 55, 'center'),
-        ('級別', 95, 'center'),
-        ('評分理由', 320, 'left'),
+        ('代號', 68, 'center'),
+        ('名稱', 100, 'center'),
+        ('股期', 44, 'center'),      # ● = 有個股期貨 (可做空/槓桿)
+        ('季', 72, 'center'),
+        ('EPS', 68, 'center'),
+        ('去年同季', 78, 'center'),
+        ('YoY%', 82, 'center'),
+        ('去年全年', 82, 'center'),  # Q1 vs 去年全年 EPS
+        ('達成率', 76, 'center'),
+        ('倍數', 62, 'center'),      # Q1 / 去年全年
+        ('QoQ%', 78, 'center'),
+        ('評分', 54, 'center'),
+        ('級別', 92, 'center'),
+        ('評分理由', 300, 'left'),
     ]
     if has_date:
         cols.append(('公告日期', 100, 'center'))
@@ -270,6 +271,7 @@ def render_releases_png(releases: list, title: str, out_path: str,
         values = [
             str(r.get('stock_id', '')),
             (r.get('name') or '')[:6],
+            '◆' if r.get('has_futures') else '',
             r.get('latest_quarter', ''),
             f'{r.get("latest_eps")}' if r.get('latest_eps') is not None else '—',
             f'{r.get("yoy_eps")}' if r.get('yoy_eps') is not None else '—',
@@ -315,8 +317,10 @@ def render_releases_png(releases: list, title: str, out_path: str,
     # === Footer ===
     y += 6
     today_hint = f' / 今日 {today_str} 公告 (鮮綠)' if today_str else ''
+    n_fut = sum(1 for r in releases if r.get('has_futures'))
     foot_text = (f'共 {len(releases)} 檔 (顯示 top {len(rows)}).  '
-                 f'高度超預期 >=8 (鮮黃) / 有亮點 >=4 (暖橘) / 衰退 <=-4 (冷藍){today_hint}')
+                 f'高度超預期 >=8 (鮮黃) / 有亮點 >=4 (暖橘) / 衰退 <=-4 (冷藍).  '
+                 f'◆ = 有股期 ({n_fut} 檔){today_hint}')
     foot_text = _strip_unrenderable(foot_text)
     draw.text((pad_x, y), foot_text, fill=COL_FOOTER, font=f_foot)
 
@@ -403,7 +407,7 @@ def render_self_reported_png(records: list, title: str, out_path: str,
         rev_s = f'{rev:,}' if isinstance(rev, (int, float)) else '—'
         values = [
             str(r.get('stock_id', '')), (r.get('name') or '')[:6],
-            '●' if r.get('has_futures') else '',
+            '◆' if r.get('has_futures') else '',
             r.get('source_type', ''), r.get('period_month') or '—',
             eps_s, yoy_s,
             f'{sc}' if sc is not None else '—',
@@ -432,7 +436,7 @@ def render_self_reported_png(records: list, title: str, out_path: str,
     n_vol = sum(1 for r in records if r.get('source_type') == '自願自結')
     n_fut = sum(1 for r in records if r.get('has_futures'))
     foot = (f'共 {len(records)} 檔 (注意股 {n_att} / 處置股 {n_dis} / 自願自結 {n_vol}, 顯示 top {len(rows)}).  '
-            f'評分: >=8 鮮黃 / >=4 暖橘 / <=-4 冷藍.  ● = 有股期({n_fut}檔, 可做空/槓桿).  * = 自結淨利/股數自算')
+            f'評分: >=8 鮮黃 / >=4 暖橘 / <=-4 冷藍.  ◆ = 有股期({n_fut}檔, 可做空/槓桿).  * = 自結淨利/股數自算')
     draw.text((pad_x, y), _strip_unrenderable(foot), fill=COL_FOOTER, font=f_foot)
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)

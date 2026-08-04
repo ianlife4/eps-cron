@@ -330,8 +330,8 @@ def write_releases(ws, releases: list, title: str = '今日新公告', title_fil
     has_date = bool(first_seen_map)
     headers = ['代號', '名稱', '市場', '最新季', 'EPS', '去年同季', 'YoY %', 'YoY Δ',
                '累計 EPS', '去年全年', '達成率', 'QoQ %',
-               '評分', '級別', '評分理由', 'GM%', 'OPM%', '業外%']
-    widths = [9, 14, 8, 10, 9, 11, 11, 11, 11, 11, 11, 11, 7, 14, 36, 9, 9, 9]
+               '評分', '級別', '評分理由', 'GM%', 'OPM%', '業外%', '股期']
+    widths = [9, 14, 8, 10, 9, 11, 11, 11, 11, 11, 11, 11, 7, 14, 36, 9, 9, 9, 6]
     if has_date:
         headers.append('公告日期')
         widths.append(13)
@@ -395,6 +395,7 @@ def write_releases(ws, releases: list, title: str = '今日新公告', title_fil
             f'{(r.get("gm_pct") or 0)*100:.1f}%' if r.get('gm_pct') is not None else '',
             f'{(r.get("opm_pct") or 0)*100:.1f}%' if r.get('opm_pct') is not None else '',
             f'{(r.get("nonop_pct") or 0)*100:.1f}%' if r.get('nonop_pct') is not None else '',
+            '✔' if r.get('has_futures') else '',
         ]
         if has_date:
             sid = r.get('stock_id')
@@ -470,8 +471,8 @@ def write_releases(ws, releases: list, title: str = '今日新公告', title_fil
 def write_revenue(ws, monthly_data: list, title: str = '💰 月營收'):
     """月營收分頁 — 對齊 v3 視覺"""
     headers = ['代號', '名稱', '市場', '月份', '當月營收(千元)', 'YoY %', 'MoM %',
-               '累計營收(千元)', '累計 YoY %']
-    _set_widths(ws, [9, 14, 8, 11, 16, 11, 11, 16, 12])
+               '累計營收(千元)', '累計 YoY %', '股期']
+    _set_widths(ws, [9, 14, 8, 11, 16, 11, 11, 16, 12, 6])
 
     _draw_title(ws, 1, title, len(headers), FILL_TITLE_BLUE, big=True)
 
@@ -504,6 +505,7 @@ def write_revenue(ws, monthly_data: list, title: str = '💰 月營收'):
             mom_str,
             accum_k,
             a_yoy_str,
+            '✔' if r.get('has_futures') else '',
         ])
 
     # 上色: YoY ≥ +50% 鮮黃, ≤ -30% 冷藍
@@ -559,8 +561,8 @@ def write_won_full_year(ws, releases: list, q_label: str,
 
     has_date = bool(first_seen_map)
     headers = ['代號', '名稱', f'{q_label} EPS', f'{prior_year}{q_label[-2:]} EPS',
-               f'{prior_year} 全年 EPS', '累計/全年', '倍數', '評分']
-    widths = [9, 14, 13, 14, 14, 12, 11, 9]
+               f'{prior_year} 全年 EPS', '累計/全年', '倍數', '評分', '股期']
+    widths = [9, 14, 13, 14, 14, 12, 11, 9, 6]
     if has_date:
         headers.append('公告日期')
         widths.append(13)
@@ -601,6 +603,7 @@ def write_won_full_year(ws, releases: list, q_label: str,
             ratio_str,
             multi_str,
             r.get('score'),
+            '✔' if r.get('has_futures') else '',
         ]
         if has_date:
             sid = r.get('stock_id')
@@ -665,8 +668,8 @@ def write_won_full_year_candidates(ws, releases: list, q_label: str):
     rows.sort(key=lambda x: -((x.get('latest_eps') or 0) - (x.get('prev_quarter_eps') or 0)))
 
     headers = ['代號', '名稱', '評分', f'{q_label} EPS', '上季 EPS', 'QoQ Δ',
-               'GM%', 'OPM%', '判斷邏輯']
-    _set_widths(ws, [9, 14, 8, 13, 12, 11, 10, 10, 36])
+               'GM%', 'OPM%', '判斷邏輯', '股期']
+    _set_widths(ws, [9, 14, 8, 13, 12, 11, 10, 10, 36, 6])
 
     # 金色色塊大標題 (候選 = 待驗證 = 黃)
     title = f'📋 候選名單：上季虧損 + {q_label} 轉正（{len(rows)} 檔，待全年驗證）'
@@ -698,6 +701,7 @@ def write_won_full_year_candidates(ws, releases: list, q_label: str):
             f'{(r.get("gm_pct") or 0)*100:.1f}%' if r.get('gm_pct') is not None else '',
             f'{(r.get("opm_pct") or 0)*100:.1f}%' if r.get('opm_pct') is not None else '',
             f'{r.get("prev_quarter") or "上季"} 虧損 → {q_label} 轉正',
+            '✔' if r.get('has_futures') else '',
         ])
 
     # 高分上色 + body 樣式
@@ -725,8 +729,8 @@ def write_top_eps(ws, releases: list, q_label: str, top_n: int = 30):
     rows = rows[:top_n]
 
     headers = ['排名', '代號', '名稱', '評分', f'{q_label} EPS', '上季 EPS', 'QoQ Δ',
-               '去年全年 EPS', '達成率']
-    _set_widths(ws, [7, 9, 14, 8, 13, 12, 11, 14, 11])
+               '去年全年 EPS', '達成率', '股期']
+    _set_widths(ws, [7, 9, 14, 8, 13, 12, 11, 14, 11, 6])
 
     title = f'💰 {q_label} EPS 高低排行（前 {len(rows)} 名）'
     _draw_title(ws, 1, title, len(headers), FILL_TITLE_BLUE, big=True)
@@ -763,6 +767,7 @@ def write_top_eps(ws, releases: list, q_label: str, top_n: int = 30):
             qoq_delta,
             r.get('prior_year_full'),
             ach_str,
+            '✔' if r.get('has_futures') else '',
         ])
 
     # 上色: 達成率 ≥ 100% 整列鮮黃高亮

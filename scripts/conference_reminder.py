@@ -85,7 +85,7 @@ def md(iso):
 def line1(e, mark=""):
     t = (e.get("time") or "").strip()
     lt = loc_tag(e)
-    return f"{t} {e['code']} {e['name']}" + (f"（{lt}）" if lt else "") + mark
+    return (f"{t} " if t else "") + f"{e['code']} {e['name']}" + (f"（{lt}）" if lt else "") + mark
 
 def line2(e, filed_flag):
     lr = f"上次報告 {md(e.get('lr_d'))} {SHORT.get(e.get('lr_b'), e.get('lr_b') or '')}" if e.get("lr_d") else "尚無報告"

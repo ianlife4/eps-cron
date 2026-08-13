@@ -1,0 +1,23 @@
+name: conference-reminder
+
+# 法說/財報中午提醒 — 由本機 12:00 排程 repository_dispatch 觸發 (準時,不吃 GHA schedule 排隊)
+# 資料: aurora/research-map/events.json (外資研究地圖每日 19:30 更新)
+on:
+  repository_dispatch:
+    types: [conference-reminder]
+  workflow_dispatch:
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Send reminder
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        run: python scripts/conference_reminder.py

@@ -58,11 +58,35 @@ now = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
 today = now.date()
 tomorrow = today + datetime.timedelta(days=1)
 
-evs = fetch_json(EVENTS_URL).get("officialEvents", [])
+data = fetch_json(EVENTS_URL)
+evs = data.get("officialEvents", [])
+
+def send(text):
+    payload = urllib.parse.urlencode({"chat_id": CHAT, "text": text}).encode()
+    r = urllib.request.urlopen(
+        urllib.request.Request(f"https://api.telegram.org/bot{TOKEN}/sendMessage", data=payload), timeout=30)
+    resp = json.load(r)
+    print("sent:", resp.get("ok"), "msg_id:", resp.get("result", {}).get("message_id"))
+
+# ── 看門狗:資料超過 2 天沒更新 → 告警(獨立於本機,斷更一定有人喊) ──
+stale_warn = None
+gen = (data.get("generated") or "")[:10]
+try:
+    age = (today - datetime.date.fromisoformat(gen)).days
+    if age >= 2:
+        stale_warn = (f"⚠ 場次資料已 {age} 天未更新（最後 {data.get('generated')}）\n"
+                      f"本機 19:30 排程可能斷了：開電腦檢查 Desktop\\外資報告分析\\update.log，"
+                      f"或手動跑 daily_update.bat")
+except ValueError:
+    stale_warn = f"⚠ 場次資料時間戳異常: {data.get('generated')!r}"
+
 td = sorted([e for e in evs if e.get("date") == today.isoformat()], key=lambda e: e.get("time") or "99")
 tm = sorted([e for e in evs if e.get("date") == tomorrow.isoformat()], key=lambda e: e.get("time") or "99")
 if not td and not tm:
-    print("no events today/tomorrow, skip")
+    if stale_warn:
+        send(stale_warn)   # 沒場次的日子也要讓斷更浮出來
+    else:
+        print("no events today/tomorrow, skip")
     sys.exit(0)
 
 filed = filed_map()
@@ -100,6 +124,8 @@ grn = [e for e in td if is_filed(e, today)]
 compact_grn = len(td) > 6   # 場次多時 ✅組縮一行
 
 lines = [f"📅 法說提醒 {today.month}/{today.day}（週{WD[today.weekday()]}）", ""]
+if stale_warn:
+    lines.insert(1, stale_warn)
 if red:
     lines.append("🔴 財報未公布 — 當天出數字，重點盯")
     for e in red:
@@ -128,9 +154,4 @@ lines.append("")
 lines.append("💡 🔴場次 82% 目標價調整當天發；✅但尚無反應的場次可等補報告")
 text = "\n".join(lines)
 print(text)
-
-payload = urllib.parse.urlencode({"chat_id": CHAT, "text": text}).encode()
-r = urllib.request.urlopen(
-    urllib.request.Request(f"https://api.telegram.org/bot{TOKEN}/sendMessage", data=payload), timeout=30)
-resp = json.load(r)
-print("sent:", resp.get("ok"), "msg_id:", resp.get("result", {}).get("message_id"))
+send(text)

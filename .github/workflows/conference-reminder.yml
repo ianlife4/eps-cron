@@ -10,7 +10,7 @@ on:
 jobs:
   remind:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15  # 12 支 TWSE/TPEX OpenAPI 最壞情況(各 60s 逾時)會超過 5 分鐘
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

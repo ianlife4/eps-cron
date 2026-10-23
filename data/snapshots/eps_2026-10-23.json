@@ -174457,6 +174457,19 @@
       "gm_pct": 0.1644,
       "opm_pct": -0.0174,
       "nonop_pct": 2.6274
+    },
+    "2026-09-30": {
+      "eps": 0.01,
+      "net_income": 1221000.0,
+      "parent_income": 1221000.0,
+      "operating_income": -8718000.0,
+      "nonop": 9617000.0,
+      "revenue": 746337000.0,
+      "gross_profit": 125369000.0,
+      "pretax_income": 899000.0,
+      "gm_pct": 0.168,
+      "opm_pct": -0.0117,
+      "nonop_pct": 7.8763
     }
   },
   "3508": {
@@ -174721,6 +174734,19 @@
       "gm_pct": 0.1284,
       "opm_pct": -0.0671,
       "nonop_pct": 0.0347
+    },
+    "2026-09-30": {
+      "eps": -0.28,
+      "net_income": -25927000.0,
+      "parent_income": -22172000.0,
+      "operating_income": -23179000.0,
+      "nonop": -1111000.0,
+      "revenue": 524305000.0,
+      "gross_profit": 70188000.0,
+      "pretax_income": -24290000.0,
+      "gm_pct": 0.1339,
+      "opm_pct": -0.0442,
+      "nonop_pct": 0.0501
     }
   },
   "3515": {
@@ -225700,6 +225726,21 @@
       "gm_pct": 0.1282,
       "opm_pct": 0.0027,
       "nonop_pct": 1.0936
+    },
+    "2026-09-30": {
+      "net_income": 44323000.0,
+      "parent_income": 44323000.0,
+      "operating_income": 51491000.0,
+      "nonop": -5188000.0,
+      "revenue": 692749000.0,
+      "gross_profit": 130045000.0,
+      "pretax_income": 46303000.0,
+      "eps": 0.51,
+      "eps_source": "computed",
+      "eps_shares_used": 86113769,
+      "gm_pct": 0.1877,
+      "opm_pct": 0.0743,
+      "nonop_pct": -0.117
     }
   },
   "3360": {

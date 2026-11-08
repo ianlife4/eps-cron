@@ -186,12 +186,17 @@ def run_daily(force_all: bool = False, scope: str = 'twse_tpex',
     try:
         from datetime import datetime as _dt
         from datetime import timedelta as _td
-        # 掃今天 + 昨天的公告 (cron 18:00 跑時抓 18:00 前的; 21:30 補抓晚公告)
+        # 掃今天 + 昨天的公告 (19:30 那班抓當天 + 補昨天晚上的)
+        # 季別跟著 freshest_q 走 (03→Q1, 06→Q2, 09→Q3, 12→年報);
+        # 2026-11-08 前寫死 quarter=1 → Q2/Q3/年報季整個 MOPS 補抓回 0 檔。
+        # Q2 以後 MOPS 是 1/1 累計數, fetch_mops_supplement 會用 eps_data 前幾季扣成單季。
+        q_num = int(freshest_q[5:7]) // 3
         mops_data = {}
         for delta in range(2):
             scan_date = (_dt.now() - _td(days=delta)).strftime('%Y-%m-%d')
             day_supplement = fetch_mops_supplement(
-                scan_date, needs_mops, quarter=1, throttle_sec=0.5, progress=True
+                scan_date, needs_mops, quarter=q_num, throttle_sec=0.8, progress=True,
+                existing_data=eps_data, expected_q_end=freshest_q,
             )
             for sid, d_data in day_supplement.items():
                 if sid not in mops_data:

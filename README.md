@@ -5,8 +5,9 @@
 ## 架構
 
 ```
-資料源: FinMind API (主) + MOPS 公開資訊觀測站 (備)
-排程:   GitHub Actions cron (每天 18:00 + 21:30 UTC+8)
+資料源: FinMind API (主) + MOPS 公開資訊觀測站 (備, 依當季換算成單季)
+排程:   Cloudflare Worker eps-cron-trigger 平日 19:30 (台北) → repository_dispatch eps-run
+        (同一支 Worker 12:00 觸發 conference-reminder 法說提醒)
 分析:   YoY、累計達成率、規則版驚喜度評分 (-9 ~ +9)
 派送:   Telegram Bot (摘要 + Excel 附件) + Cloudflare Worker /eps 頁
 ```

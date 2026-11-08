@@ -1,0 +1,305 @@
+{
+ "twse_ok": true,
+ "tpex_ok": true,
+ "stocks": {
+  "1213": {
+   "name": "大飲",
+   "market": "上市",
+   "altered": true,
+   "periodic": false,
+   "managed": false,
+   "suspended": false,
+   "freq": ""
+  },
+  "1538": {
+   "name": "正峰",
+   "market": "上市",
+   "altered": true,
+   "periodic": false,
+   "managed": false,
+   "suspended": false,
+   "freq": ""
+  },
+  "2314": {
+   "name": "台揚",
+   "market": "上市",
+   "altered": true,
+   "periodic": true,
+   "managed": false,
+   "suspended": false,
+   "freq": ""
+  },
+  "2321": {
+   "name": "東訊",
+   "market": "上市",
+   "altered": true,
+   "periodic": false,
+   "managed": false,
+   "suspended": false,
+   "freq": ""
+  },
+  "2424": {
+   "name": "隴華",
+   "market": "上市",
+   "altered": true,
+   "periodic": false,
+   "managed": false,
+   "suspended": false,
+   "freq": ""
+  },
+  "3593": {
+   "name": "力銘",
+   "market": "上市",
+   "altered": true,
+   "periodic": false,
+   "managed": false,
+   "suspended": false,
+   "freq": ""
+  },
+  "4943": {
+   "name": "康控-KY",
+   "market": "上市",
+   "altered": true,
+   "periodic": true,
+   "managed": false,
+   "suspended": false,
+   "freq": ""
+  },
+  "6225": {
+   "name": "天瀚",
+   "market": "上市",
+   "altered": true,
+   "periodic": false,
+   "managed": false,
+   "suspended": false,
+   "freq": ""
+  },
+  "8101": {
+   "name": "華冠",
+   "market": "上市",
+   "altered": true,
+   "periodic": false,
+   "managed": false,
+   "suspended": false,
+   "freq": ""
+  },
+  "9110": {
+   "name": "越南控-DR",
+   "market": "上市",
+   "altered": true,
+   "periodic": false,
+   "managed": false,
+   "suspended": false,
+   "freq": ""
+  },
+  "2067": {
+   "name": "嘉鋼",
+   "market": "上櫃",
+   "altered": true,
+   "periodic": false,
+   "managed": false,
+   "suspended": false,
+   "freq": ""
+  },
+  "3064": {
+   "name": "泰偉",
+   "market": "上櫃",
+   "altered": true,
+   "periodic": false,
+   "managed": false,
+   "suspended": false,
+   "freq": ""
+  },
+  "3259": {
+   "name": "鑫創",
+   "market": "上櫃",
+   "altered": true,
+   "periodic": false,
+   "managed": false,
+   "suspended": false,
+   "freq": ""
+  },
+  "3625": {
+   "name": "西勝",
+   "market": "上櫃",
+   "altered": true,
+   "periodic": false,
+   "managed": false,
+   "suspended": false,
+   "freq": ""
+  },
+  "3629": {
+   "name": "地心引力",
+   "market": "上櫃",
+   "altered": true,
+   "periodic": true,
+   "managed": false,
+   "suspended": false,
+   "freq": "030"
+  },
+  "3632": {
+   "name": "研勤",
+   "market": "上櫃",
+   "altered": true,
+   "periodic": true,
+   "managed": false,
+   "suspended": false,
+   "freq": "030"
+  },
+  "3664": {
+   "name": "安瑞-KY",
+   "market": "上櫃",
+   "altered": true,
+   "periodic": true,
+   "managed": false,
+   "suspended": false,
+   "freq": "030"
+  },
+  "3710": {
+   "name": "連展投控",
+   "market": "上櫃",
+   "altered": true,
+   "periodic": false,
+   "managed": false,
+   "suspended": false,
+   "freq": ""
+  },
+  "4207": {
+   "name": "環泰",
+   "market": "上櫃",
+   "altered": false,
+   "periodic": false,
+   "managed": false,
+   "suspended": true,
+   "freq": ""
+  },
+  "4529": {
+   "name": "淳紳",
+   "market": "上櫃",
+   "altered": true,
+   "periodic": true,
+   "managed": false,
+   "suspended": false,
+   "freq": "030"
+  },
+  "4534": {
+   "name": "慶騰",
+   "market": "上櫃",
+   "altered": false,
+   "periodic": false,
+   "managed": false,
+   "suspended": true,
+   "freq": ""
+  },
+  "4609": {
+   "name": "唐鋒",
+   "market": "上櫃",
+   "altered": true,
+   "periodic": true,
+   "managed": false,
+   "suspended": false,
+   "freq": "030"
+  },
+  "4804": {
+   "name": "大略-KY",
+   "market": "上櫃",
+   "altered": false,
+   "periodic": false,
+   "managed": false,
+   "suspended": true,
+   "freq": ""
+  },
+  "5301": {
+   "name": "寶得利",
+   "market": "上櫃",
+   "altered": true,
+   "periodic": false,
+   "managed": false,
+   "suspended": false,
+   "freq": ""
+  },
+  "5355": {
+   "name": "佳總",
+   "market": "上櫃",
+   "altered": false,
+   "periodic": false,
+   "managed": false,
+   "suspended": true,
+   "freq": ""
+  },
+  "5701": {
+   "name": "劍湖山",
+   "market": "上櫃",
+   "altered": true,
+   "periodic": false,
+   "managed": false,
+   "suspended": false,
+   "freq": ""
+  },
+  "6236": {
+   "name": "中湛",
+   "market": "上櫃",
+   "altered": true,
+   "periodic": false,
+   "managed": false,
+   "suspended": false,
+   "freq": ""
+  },
+  "8084": {
+   "name": "巨虹",
+   "market": "上櫃",
+   "altered": true,
+   "periodic": false,
+   "managed": false,
+   "suspended": false,
+   "freq": ""
+  },
+  "8176": {
+   "name": "智捷",
+   "market": "上櫃",
+   "altered": false,
+   "periodic": false,
+   "managed": false,
+   "suspended": true,
+   "freq": ""
+  },
+  "8277": {
+   "name": "商丞",
+   "market": "上櫃",
+   "altered": true,
+   "periodic": false,
+   "managed": false,
+   "suspended": false,
+   "freq": ""
+  },
+  "8291": {
+   "name": "尚茂",
+   "market": "上櫃",
+   "altered": true,
+   "periodic": false,
+   "managed": false,
+   "suspended": false,
+   "freq": "010"
+  },
+  "8444": {
+   "name": "綠河-KY",
+   "market": "上櫃",
+   "altered": true,
+   "periodic": true,
+   "managed": false,
+   "suspended": false,
+   "freq": "030"
+  },
+  "8933": {
+   "name": "愛地雅",
+   "market": "上櫃",
+   "altered": true,
+   "periodic": false,
+   "managed": false,
+   "suspended": false,
+   "freq": ""
+  }
+ },
+ "fetched_at": "2026-11-08T18:45:22",
+ "date": "2026-11-08"
+}

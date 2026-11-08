@@ -444,6 +444,88 @@ def render_self_reported_png(records: list, title: str, out_path: str,
     return out_path
 
 
+TM_COLORS = {   # 全額交割異動: (底色, 字色)
+    'deep':   ((230, 124, 115), (80, 0, 0)),      # 全額+分盤 / 停止買賣
+    'red':    ((255, 199, 206), (156, 0, 6)),     # 新列 / 併案 / 名單新增
+    'orange': ((252, 228, 214), (131, 60, 12)),   # 續列全額
+    'yellow': ((255, 242, 204), (127, 96, 0)),    # 取消分盤 (仍全額)
+    'green':  ((198, 239, 206), (0, 97, 0)),      # 恢復普通交易
+    'gray':   ((237, 237, 237), (64, 64, 64)),    # 名單移出 (可能下市) / 其他
+}
+
+
+def render_trading_method_png(rows: list, title: str, out_path: str, date_str: str = '',
+                              color_of=None, foot_lines: list = None, max_rows: int = 30) -> str:
+    """全額交割 / 交易方法異動表 (手機可讀寬度 ~780px)。
+
+    欄位: 代號 / 名稱 / 市場 / 異動 / 生效日 / 公告日 / 原因 / 股期; 依異動類型上色 (TM_COLORS)。
+    """
+    rows = rows[:max_rows]
+    cols = [('代號', 56, 'center'), ('名稱', 84, 'center'), ('市場', 46, 'center'),
+            ('異動', 126, 'center'), ('生效日', 66, 'center'), ('公告日', 66, 'center'),
+            ('原因', 260, 'left'), ('股期', 40, 'center')]
+    foot_lines = foot_lines or []
+    pad_x, title_h, sub_h, header_h, row_h, foot_line_h = 16, 52, 26, 34, 30, 18
+    table_w = sum(c[1] for c in cols)
+    canvas_w = table_w + pad_x * 2
+    canvas_h = (title_h + sub_h + header_h + row_h * max(1, len(rows))
+                + 10 + foot_line_h * max(1, len(foot_lines)) + pad_x)
+    img = Image.new('RGB', (canvas_w, canvas_h), color=(255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    f_title, f_sub = _load_font(19, bold=True), _load_font(12)
+    f_header, f_body, f_foot = _load_font(14, bold=True), _load_font(13), _load_font(11)
+    f_body_bold = _load_font(13, bold=True)
+
+    draw.rectangle((0, 0, canvas_w, title_h), fill=COL_TITLE_BG)
+    tc = _strip_unrenderable(title)
+    draw.text(((canvas_w - draw.textlength(tc, font=f_title)) / 2, (title_h - 21) / 2), tc,
+              fill=COL_WHITE, font=f_title)
+    y = title_h
+    sub = _strip_unrenderable(f'資料日期 {date_str} | MOPS 重大訊息 + 證交所/櫃買官方名單 | 公告日約領先生效日 2~4 個交易日')
+    draw.rectangle((0, y, canvas_w, y + sub_h), fill=(222, 235, 247))
+    draw.text(((canvas_w - draw.textlength(sub, font=f_sub)) / 2, y + 6), sub, fill=(31, 56, 100), font=f_sub)
+    y += sub_h
+
+    x = pad_x
+    draw.rectangle((pad_x, y, pad_x + table_w, y + header_h), fill=COL_HEADER_BG)
+    for label, w, _a in cols:
+        draw.text((x + (w - draw.textlength(label, font=f_header)) / 2, y + (header_h - 16) / 2),
+                  label, fill=COL_WHITE, font=f_header)
+        x += w
+    y += header_h
+
+    def _md(d):
+        return d[5:] if d and len(d) >= 10 else (d or '—')
+
+    for r in rows:
+        bg, fg = TM_COLORS.get(color_of(r['event']) if color_of else 'gray', TM_COLORS['gray'])
+        font_used = f_body_bold if bg == TM_COLORS['deep'][0] else f_body
+        draw.rectangle((pad_x, y, pad_x + table_w, y + row_h), fill=bg)
+        values = [r.get('stock_id', ''), (r.get('name') or '')[:6], r.get('market', ''),
+                  r.get('event', ''), _md(r.get('effective_date')), _md(r.get('announce_date')),
+                  '、'.join(r.get('reason_tags') or []) or '—', '◆' if r.get('has_futures') else '']
+        x = pad_x
+        for (label, w, align), val in zip(cols, values):
+            txt = _strip_unrenderable(str(val))
+            while draw.textlength(txt, font=font_used) > w - 10 and len(txt) > 1:
+                txt = txt[:-2] + '…'
+            vw = draw.textlength(txt, font=font_used)
+            tx = x + (w - vw) / 2 if align == 'center' else x + 6
+            draw.text((tx, y + (row_h - 16) / 2), txt, fill=fg, font=font_used)
+            draw.line([(x, y), (x, y + row_h)], fill=COL_BORDER, width=1)
+            x += w
+        draw.line([(pad_x + table_w, y), (pad_x + table_w, y + row_h)], fill=COL_BORDER, width=1)
+        draw.line([(pad_x, y + row_h), (pad_x + table_w, y + row_h)], fill=COL_BORDER, width=1)
+        y += row_h
+    y += 10
+    for line in foot_lines:
+        draw.text((pad_x, y), _strip_unrenderable(line), fill=COL_FOOTER, font=f_foot)
+        y += foot_line_h
+    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+    img.save(out_path, format='PNG', optimize=True)
+    return out_path
+
+
 if __name__ == '__main__':
     sys.stdout.reconfigure(encoding='utf-8')
     sample = [

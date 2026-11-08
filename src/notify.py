@@ -274,6 +274,36 @@ def format_self_reported_summary(date_str: str, records: list) -> str:
     return '\n'.join(lines)
 
 
+def format_trading_method_summary(date_str: str, tm: dict, icon_of=None) -> str:
+    """全額交割 / 交易方法異動 TG 摘要 (HTML)。tm = fetch_trading_method.scan_trading_method() 結果。"""
+    from html import escape
+    alerts = tm.get('alerts') or []
+    rows = tm.get('official_rows') or []
+    lines = [f'<b>⚠️ 全額交割/交易方法異動 {date_str}</b>（{len(alerts)} 則）',
+             '<i>變更交易方法＝財報惡化訊號；公告日約領先生效 2~4 個交易日</i>',
+             '━' * 12]
+    for r in alerts[:25]:
+        icon = icon_of(r['event']) if icon_of else '•'
+        fut = ' ⚡' if r.get('has_futures') else ''
+        eff = r.get('effective_date') or ''
+        eff_s = f' 生效 {eff[5:]}' if len(eff) >= 10 else ''
+        why = '、'.join(r.get('reason_tags') or [])
+        why_s = f' — {escape(why)}' if why else ''
+        lines.append(f'{icon} <code>{r["stock_id"]}</code> {escape(r.get("name") or "")}{fut}'
+                     f'〔{r.get("market", "")}〕<b>{escape(r["event"])}</b>{eff_s}{why_s}')
+    if len(alerts) > 25:
+        lines.append(f'  …+{len(alerts) - 25} 則（詳見 Excel「交易方法異動」）')
+    if rows:
+        def _cnt(mk):
+            alt = [r for r in rows if r['market'] == mk and r['altered']]
+            return f'{mk} {len(alt)} 檔(分盤 {sum(1 for r in alt if r["periodic"])})'
+        lines += ['', f'📋 目前全額交割: {_cnt("上市")} / {_cnt("上櫃")}']
+    lines += ['',
+              '<i>恢復條件: 上市＝最近二期淨值均≥股本1/2；上櫃＝最近一期≥股本1/2且較前期增加'
+              '｜⛔ 全額+分盤 🔴 新列/併案 🟠 續列 🟡 取消分盤 🟢 恢復 ⚪ 名單移出(待確認)</i>']
+    return '\n'.join(lines)
+
+
 if __name__ == '__main__':
     # 自測：發測試訊息
     import sys

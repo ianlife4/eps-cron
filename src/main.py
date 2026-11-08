@@ -30,8 +30,8 @@ from compare import analyze_one, freshest_quarter_end, quarter_label, build_firs
 from score import score_rule_based
 from report import build_report
 from notify import (send_message, send_document, send_photo, format_daily_summary,
-                    format_self_reported_summary)
-from render_image import render_releases_png, render_self_reported_png
+                    format_self_reported_summary, format_trading_method_summary)
+from render_image import render_releases_png, render_self_reported_png, render_trading_method_png
 from fetch_mops import fetch_mops_supplement
 
 # AI 評分 (可選, 沒 API key 自動 fallback 到規則版)
@@ -261,6 +261,25 @@ def run_daily(force_all: bool = False, scope: str = 'twse_tpex',
     except Exception as e:
         print(f'[3c] 自結速報失敗 (不影響主流程): {e}')
 
+    # [3d] 全額交割追蹤 — MOPS「變更/恢復交易方法」公告 + 證交所/櫃買官方名單比對 (財報惡化領先訊號)
+    #      狀態檔 data/trading_method/*.json 在 [6] 推播後才存 (推播前掛掉 → 下一輪重推, 不漏)
+    print('[3d] 全額交割/交易方法異動掃描...')
+    trading_method = None
+    try:
+        from fetch_trading_method import scan_trading_method
+        try:
+            from futures_list import fetch_stock_futures_set
+            _tm_fut = fetch_stock_futures_set()
+        except Exception:
+            _tm_fut = set()
+        _names = {k: (v or {}).get('name', '') for k, v in classifier.items()} \
+            if isinstance(classifier, dict) else {}
+        trading_method = scan_trading_method(today_str, name_map=_names, futures_set=_tm_fut)
+        print(f'[3d] 要推 {len(trading_method["alerts"])} 則')
+    except Exception as e:
+        print(f'[3d] 全額交割追蹤失敗 (不影響主流程): {e}')
+    tm_alerts = (trading_method or {}).get('alerts') or []
+
     new_set = detect_new_releases(eps_data, yesterday_eps if not force_all else {}, freshest_q)
     if force_all:
         print(f'[3] FORCE_ALL: 偵測到 {len(new_set)} 檔已公告 {freshest_q} 為最新一季')
@@ -366,13 +385,13 @@ def run_daily(force_all: bool = False, scope: str = 'twse_tpex',
         print(f'  股期標記 (releases/月營收) 失敗 (略過): {_e}')
     build_report(today_str, releases, monthly_data, stats, str(excel_path),
                  q_label=q_label, first_seen_map=first_seen_map, today_str=today_str,
-                 self_reported=self_reported)
+                 self_reported=self_reported, trading_method=trading_method)
     print(f'  產出: {excel_path} (當期: {q_label})')
 
     # 7. 發 Telegram — 有新季報公告 或 有自結資料 就推 (自結不靠季報觸發)
     if no_tg:
         print('[6] --no-tg, 跳過 Telegram')
-    elif stats['new_count'] > 0 or force_all or self_reported:
+    elif stats['new_count'] > 0 or force_all or self_reported or tm_alerts:
         print('[6] 推 Telegram...')
         token = os.environ['TG_BOT_TOKEN']
         chat_id = os.environ['TG_CHAT_ID']
@@ -468,13 +487,50 @@ def run_daily(force_all: bool = False, scope: str = 'twse_tpex',
             except Exception as e:
                 print(f'  ⚠️ 自結 PNG 渲染/推送失敗 (略過, 不影響文字+Excel): {e}')
 
-        # 7d. Excel 完整檔 (官方 EPS + 自結速報分頁) — 一律送
+        # 7c2. 全額交割/交易方法異動 — 有新事件才推: 文字摘要 + PNG (變更紅/恢復綠)
+        if tm_alerts:
+            from fetch_trading_method import event_color, TG_ICON
+            try:
+                send_message(token, chat_id, format_trading_method_summary(
+                    today_str, trading_method, icon_of=lambda ev: TG_ICON[event_color(ev)]))
+                time.sleep(1)
+                print(f'  ✓ 交易方法異動文字推送: {len(tm_alerts)} 則')
+            except Exception as e:
+                print(f'  ⚠️ 交易方法異動文字推送失敗 (略過): {e}')
+            try:
+                tm_png = REPORTS_DIR / f'eps_trading_method_{today_str}.png'
+                tm_rows = trading_method.get("official_rows") or []
+                n = lambda mk: sum(1 for r in tm_rows if r["market"] == mk and r["altered"])  # noqa: E731
+                render_trading_method_png(
+                    tm_alerts, title=f'全額交割/交易方法異動 ({len(tm_alerts)} 則)',
+                    out_path=str(tm_png), date_str=today_str, color_of=event_color,
+                    foot_lines=[f'目前全額交割: 上市 {n("上市")} 檔 / 上櫃 {n("上櫃")} 檔 (完整名單見 Excel「全額交割名單」)',
+                                '恢復條件: 上市=最近二期淨值均>=股本1/2; 上櫃=最近一期>=股本1/2且較前期增加',
+                                '深紅=全額+分盤  紅=新列/併案  橘=續列  黃=取消分盤  綠=恢復  灰=名單移出(待確認)  ◆=有股期'])
+                send_photo(token, chat_id, str(tm_png),
+                           caption=f'⚠️ {today_str} 全額交割異動 ({len(tm_alerts)} 則)')
+                time.sleep(1)
+                print(f'  ✓ 交易方法異動 PNG 推送: {tm_png.name}')
+            except Exception as e:
+                print(f'  ⚠️ 交易方法異動 PNG 失敗 (略過): {e}')
+
+        # 7d. Excel 完整檔 (官方 EPS + 自結速報 + 全額交割分頁) — 一律送
+        tm_cap = f' / {len(tm_alerts)} 全額交割異動' if tm_alerts else ''
         send_document(token, chat_id, str(excel_path),
                       caption=f'📊 EPS 日報 {today_str} '
-                              f'({stats["new_count"]} 新季報 / {len(self_reported or [])} 自結)')
+                              f'({stats["new_count"]} 新季報 / {len(self_reported or [])} 自結{tm_cap})')
         print('  ✓ TG 推播完成')
     else:
-        print('[6] 無新季報也無自結，跳過 TG 推播')
+        print('[6] 無新季報也無自結也無全額交割異動，跳過 TG 推播')
+
+    # 全額交割狀態檔 — 推播後才存 (GHA commit data/trading_method/)
+    if trading_method:
+        try:
+            from fetch_trading_method import save_state
+            save_state(trading_method)
+            print('  ✓ 全額交割狀態檔已更新')
+        except Exception as e:
+            print(f'  ⚠️ 全額交割狀態檔寫入失敗: {e}')
 
     print(f'\n=== 完成 ===')
     return {'stats': stats, 'excel': str(excel_path), 'releases_count': len(releases)}

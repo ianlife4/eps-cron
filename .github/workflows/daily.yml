@@ -80,7 +80,8 @@ jobs:
           git config user.name "eps-cron-bot"
           git config user.email "eps-cron@noreply.github.com"
           # 不 commit *.png (檔多易爆, TG 已收到)
-          git add data/snapshots/ reports/*.xlsx || true
+          # data/trading_method/ = 全額交割追蹤狀態 (已推過的事件 + 前一天官方名單), 沒 commit 會天天重推
+          git add data/snapshots/ data/trading_method/ reports/*.xlsx || true
           # idempotent skip — 沿用 aurora-cron pattern
           if git diff --staged --quiet; then
             echo "✓ No changes (idempotent skip)"

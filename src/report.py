@@ -880,9 +880,87 @@ def write_self_reported(ws, records: list, title: str = '🆕 自結速報'):
     ws.freeze_panes = 'C3'
 
 
+TM_FILL = {k: PatternFill('solid', start_color=v) for k, v in {
+    'deep': 'E67C73', 'red': 'FFC7CE', 'orange': 'FCE4D6',
+    'yellow': 'FFF2CC', 'green': 'C6EFCE', 'gray': 'EDEDED'}.items()}
+
+
+def _write_table(ws, title: str, headers: list, widths: list, rows: list, fills: list,
+                 left_cols=(), title_fill=FILL_TITLE_RED, bold_rows=()):
+    _set_widths(ws, widths)
+    _draw_title(ws, 1, title, len(headers), title_fill, big=True)
+    for c, h in enumerate(headers, 1):
+        cell = ws.cell(row=2, column=c, value=h)
+        cell.font, cell.fill, cell.alignment, cell.border = FONT_HEADER, FILL_HEADER, ALIGN_CENTER, BORDER
+    ws.row_dimensions[2].height = 22
+    bold = Font(name='Microsoft JhengHei', bold=True, size=10)
+    for i, (vals, fill) in enumerate(zip(rows, fills)):
+        ws.append(vals)
+        r = ws.max_row
+        for c in range(1, len(headers) + 1):
+            cell = ws.cell(row=r, column=c)
+            if fill:
+                cell.fill = fill
+            cell.font = bold if i in bold_rows else FONT_BODY
+            cell.alignment = ALIGN_LEFT if c in left_cols else ALIGN_CENTER
+            cell.border = BORDER
+    ws.freeze_panes = 'C3'
+
+
+def write_trading_method_events(ws, tm: dict, color_of):
+    """交易方法異動: 今日要推的 (粗體 + ✔) 在上, 再接近 180 天 MOPS 事件紀錄。"""
+    alerts = tm.get('alerts') or []
+    today_keys = {(a['stock_id'], a.get('announce_date'), a['event']) for a in alerts}
+    rows, fills, bold = [], [], set()
+    seen = set()
+    for r in alerts + (tm.get('history') or []):
+        k = (r['stock_id'], r.get('announce_date'), r['event'])
+        if k in seen:
+            continue
+        seen.add(k)
+        is_today = k in today_keys
+        if is_today:
+            bold.add(len(rows))
+        rows.append([
+            '✔' if is_today else '', r.get('announce_date') or '', r['stock_id'], r.get('name', ''),
+            r.get('market', ''), r['event'], r.get('effective_date') or '',
+            '、'.join(r.get('reason_tags') or []), r.get('result', ''), r.get('reason', ''),
+            r.get('source', ''), '✔' if r.get('has_futures') else ''])
+        fills.append(TM_FILL.get(color_of(r['event'])))
+    headers = ['今日', '公告日', '代號', '名稱', '市場', '異動', '生效日', '原因', '處理結果',
+               '發生緣由(公告原文)', '來源', '股期']
+    _write_table(ws, f'⚠️ 交易方法異動 (今日 {len(alerts)} 則 / 近 180 天紀錄)', headers,
+                 [6, 11, 7, 11, 6, 15, 11, 30, 26, 70, 9, 6], rows, fills,
+                 left_cols=(8, 9, 10), bold_rows=bold)
+
+
+def write_trading_method_list(ws, tm: dict, color_of):
+    """證交所/櫃買「目前」變更交易方法名單 + 每檔最近一則 MOPS 公告。"""
+    off = tm.get('official') or {}
+    rows, fills = [], []
+    for r in tm.get('official_rows') or []:
+        if r['altered']:
+            fill = TM_FILL['deep'] if r['periodic'] else TM_FILL['red']
+        else:
+            fill = TM_FILL['gray']  # 上櫃名單裡只有停止交易/管理股票的
+        rows.append([r['stock_id'], r['name'], r['market'], '✔' if r['altered'] else '',
+                     '✔' if r['periodic'] else '', r.get('freq') or '', '✔' if r['managed'] else '',
+                     '✔' if r['suspended'] else '', r['last_date'], r['last_event'], r['last_reason'],
+                     r['recover_rule'], '✔' if r.get('has_futures') else ''])
+        fills.append(fill)
+    n_alt = sum(1 for r in tm.get('official_rows') or [] if r['altered'])
+    src = (f'上市{"✓" if off.get("twse_ok") else "✗(抓取失敗)"} 上櫃{"✓" if off.get("tpex_ok") else "✗(抓取失敗)"}')
+    headers = ['代號', '名稱', '市場', '全額交割', '分盤', '撮合(分)', '管理股票', '停止交易',
+               '最近公告日', '最近異動', '最近原因', '恢復條件', '股期']
+    _write_table(ws, f'📋 目前全額交割名單 ({n_alt} 檔, 官方 {src})', headers,
+                 [7, 11, 6, 9, 6, 8, 9, 9, 11, 15, 30, 34, 6], rows, fills,
+                 left_cols=(11, 12), title_fill=FILL_TITLE_BLUE)
+
+
 def build_report(date_str: str, releases: list, monthly: list, stats: dict, out_path: str,
                  q_label: str = None, first_seen_map: dict = None,
-                 today_str: str = None, self_reported: list = None):
+                 today_str: str = None, self_reported: list = None,
+                 trading_method: dict = None):
     """產出完整報告
 
     分頁順序 (v3 風格):
@@ -973,6 +1051,13 @@ def build_report(date_str: str, releases: list, monthly: list, stats: dict, out_
         ws_sr = wb.create_sheet('自結速報')
         write_self_reported(ws_sr, self_reported,
                             title=f'🆕 自結速報 ({len(self_reported)} 檔, 領先官方財報)')
+
+    # 全額交割追蹤 (MOPS 交易方法公告 + 官方目前名單) — 有資料就出, 不限今天有無異動
+    if trading_method:
+        from fetch_trading_method import event_color
+        write_trading_method_events(wb.create_sheet('交易方法異動'), trading_method, event_color)
+        if trading_method.get('official_rows'):
+            write_trading_method_list(wb.create_sheet('全額交割名單'), trading_method, event_color)
 
     # 月營收
     if monthly:

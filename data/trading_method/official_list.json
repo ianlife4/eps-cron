@@ -164,15 +164,6 @@
    "suspended": false,
    "freq": ""
   },
-  "4207": {
-   "name": "環泰",
-   "market": "上櫃",
-   "altered": false,
-   "periodic": false,
-   "managed": false,
-   "suspended": true,
-   "freq": ""
-  },
   "4529": {
    "name": "淳紳",
    "market": "上櫃",
@@ -221,10 +212,10 @@
   "5355": {
    "name": "佳總",
    "market": "上櫃",
-   "altered": false,
+   "altered": true,
    "periodic": false,
    "managed": false,
-   "suspended": true,
+   "suspended": false,
    "freq": ""
   },
   "5701": {
@@ -252,15 +243,6 @@
    "periodic": false,
    "managed": false,
    "suspended": false,
-   "freq": ""
-  },
-  "8176": {
-   "name": "智捷",
-   "market": "上櫃",
-   "altered": false,
-   "periodic": false,
-   "managed": false,
-   "suspended": true,
    "freq": ""
   },
   "8277": {
@@ -300,6 +282,6 @@
    "freq": ""
   }
  },
- "fetched_at": "2026-11-08T18:45:22",
- "date": "2026-11-08"
+ "fetched_at": "2026-11-09T12:29:06",
+ "date": "2026-11-09"
 }

@@ -261,7 +261,7 @@
    "periodic": false,
    "managed": false,
    "suspended": false,
-   "freq": "010"
+   "freq": ""
   },
   "8444": {
    "name": "綠河-KY",
@@ -282,6 +282,6 @@
    "freq": ""
   }
  },
- "fetched_at": "2026-11-09T12:29:06",
- "date": "2026-11-09"
+ "fetched_at": "2026-11-10T12:33:15",
+ "date": "2026-11-10"
 }

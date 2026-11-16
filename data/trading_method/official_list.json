@@ -173,15 +173,6 @@
    "suspended": false,
    "freq": "030"
   },
-  "4534": {
-   "name": "慶騰",
-   "market": "上櫃",
-   "altered": false,
-   "periodic": false,
-   "managed": false,
-   "suspended": true,
-   "freq": ""
-  },
   "4609": {
    "name": "唐鋒",
    "market": "上櫃",
@@ -282,6 +273,6 @@
    "freq": ""
   }
  },
- "fetched_at": "2026-11-13T12:21:52",
- "date": "2026-11-13"
+ "fetched_at": "2026-11-16T12:13:04",
+ "date": "2026-11-16"
 }

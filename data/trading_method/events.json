@@ -1640,5 +1640,183 @@
   "source": "MOPS",
   "first_seen": "2026-10-12",
   "has_futures": false
+ },
+ {
+  "stock_id": "3632",
+  "name": "研勤",
+  "market": "上櫃",
+  "event": "取消分盤",
+  "is_correction": false,
+  "announce_date": "2026-11-17",
+  "announce_time": "173716",
+  "effective_date": "2026-11-19",
+  "reason_tags": [
+   "淨值回升≥股本3/10"
+  ],
+  "reason": "依證券商營業處所買賣有價證券業務規則第12條第1項第1款、第4項第1款及第7項，115年第3季財務報告淨值已不低於股本二分之一及十分之三，惟淨值仍未較前期增加，本公司股票繼續變更交易方法但取消分盤方式交易。",
+  "result": "變更交易方法",
+  "subject": "公告本公司上櫃股票仍繼續維持變更交易方法(繼續採預收款券方式交易)，但取消分盤方式交易。",
+  "spoke_date": "20261117",
+  "spoke_time": "173716",
+  "seq_no": "1",
+  "source": "MOPS",
+  "first_seen": "2026-11-17",
+  "has_futures": false
+ },
+ {
+  "stock_id": "3259",
+  "name": "鑫創",
+  "market": "上櫃",
+  "event": "新列全額",
+  "is_correction": false,
+  "announce_date": "2026-11-17",
+  "announce_time": "174104",
+  "effective_date": "2026-11-19",
+  "reason_tags": [
+   "淨值低於股本1/2",
+   "繼續經營疑慮"
+  ],
+  "reason": "(1)業務規則條款:第12條第1項1款及第12條第1項3款。(2)發生緣由:115年第3季財務報告顯示淨值已低於所列示股本二分之一且經會計師出具繼續經營能力存在重大不確定性之核閱報告。",
+  "result": "變更交易方法",
+  "subject": "公告本公司依證券商營業處所買賣有價證券業務規則變更交易方法",
+  "spoke_date": "20261117",
+  "spoke_time": "174104",
+  "seq_no": "1",
+  "source": "MOPS",
+  "first_seen": "2026-11-17",
+  "has_futures": false
+ },
+ {
+  "stock_id": "3710",
+  "name": "連展投控",
+  "market": "上櫃",
+  "event": "續列全額",
+  "is_correction": false,
+  "announce_date": "2026-11-17",
+  "announce_time": "174228",
+  "effective_date": "2026-11-19",
+  "reason_tags": [
+   "淨值低於股本1/2"
+  ],
+  "reason": "114年第三季之財務報告顯示淨值已低於所列示股本二分之一，而採預收款券方式交易。本次公告並申報115年度第三季財務報告顯示其淨值已不低於所列示股本二分之一，惟淨值仍未較前期增加，依櫃買中心業務規則第12條第1項第1款及第4項第1款規定，證券經紀商於接受委託買賣該公司有價證券時，應繼續先收足款券始得辦理買賣申報。",
+  "result": "變更交易方法",
+  "subject": "公告本公司上櫃有價證券繼續維持變更交易方法",
+  "spoke_date": "20261117",
+  "spoke_time": "174228",
+  "seq_no": "1",
+  "source": "MOPS",
+  "first_seen": "2026-11-17",
+  "has_futures": false
+ },
+ {
+  "stock_id": "8291",
+  "name": "尚茂",
+  "market": "上櫃",
+  "event": "續列全額",
+  "is_correction": false,
+  "announce_date": "2026-11-17",
+  "announce_time": "180940",
+  "effective_date": "2026-11-19",
+  "reason_tags": [
+   "淨值低於股本1/2"
+  ],
+  "reason": "本公司前因公告並申報115年第2季之財務報告顯示淨值已低於所列示股本二分之一，而採預收款券方式交易。本次公告並申報115年第3季財務報告顯示其淨值已不低於所列示股本二分之一，惟淨值仍未較前期增加，依櫃買中心業務規則第12條第1項第1款及第4項第1款規定，證券經紀商於接受委託買賣該公司有價證券時，應繼續先收足款券始得辦理買賣申報。",
+  "result": "變更交易方法",
+  "subject": "公告本公司股票繼續變更交易方法",
+  "spoke_date": "20261117",
+  "spoke_time": "180940",
+  "seq_no": "3",
+  "source": "MOPS",
+  "first_seen": "2026-11-17",
+  "has_futures": false
+ },
+ {
+  "stock_id": "4304",
+  "name": "勝昱",
+  "market": "上櫃",
+  "event": "新列全額",
+  "is_correction": false,
+  "announce_date": "2026-11-17",
+  "announce_time": "184951",
+  "effective_date": "2026-11-19",
+  "reason_tags": [
+   "淨值低於股本1/2"
+  ],
+  "reason": "本公司公告並申報115年第3季財務報告顯示淨值已低於所列示股本二分之一，核有櫃買中心業務規則第12條第1項第1款規定之情事。",
+  "result": "變更交易方法。",
+  "subject": "公告本公司股票依證券商營業處所買賣有價證券業務規則變更交易方法",
+  "spoke_date": "20261117",
+  "spoke_time": "184951",
+  "seq_no": "1",
+  "source": "MOPS",
+  "first_seen": "2026-11-17",
+  "has_futures": false
+ },
+ {
+  "stock_id": "5355",
+  "name": "佳總",
+  "market": "上櫃",
+  "event": "恢復普通交易",
+  "is_correction": false,
+  "announce_date": "2026-11-17",
+  "announce_time": "185526",
+  "effective_date": "2026-11-19",
+  "reason_tags": [
+   "淨值回升≥股本1/2"
+  ],
+  "reason": "本公司115Q3財報淨值已大於財務報告股本二分之一，且本期淨值較前期提升，符合櫃買中心業務規則第12條第3項及第4項第1款之規定，故本公司之有價證券自115年11月19日起恢復為普通交割方式之買賣。",
+  "result": "櫃買中心已公告本公司上櫃有價證券自民國115年11月19日起恢復普通交易方法。",
+  "subject": "公告本公司上櫃有價證券自民國115年11月19日起恢復普通交易方法",
+  "spoke_date": "20261117",
+  "spoke_time": "185526",
+  "seq_no": "1",
+  "source": "MOPS",
+  "first_seen": "2026-11-17",
+  "has_futures": false
+ },
+ {
+  "stock_id": "1538",
+  "name": "正峰",
+  "market": "上市",
+  "event": "併案變更",
+  "is_correction": false,
+  "announce_date": "2026-11-17",
+  "announce_time": "191914",
+  "effective_date": "2026-11-17",
+  "reason_tags": [
+   "淨值低於股本1/2",
+   "繼續經營疑慮"
+  ],
+  "reason": "正峰股份有限公司前因有同細則第49條第1項第1款規定情事，其上市有價證券經列為變更交易方法在案。嗣查該公司最近期公告申報之財務報告，經會計師出具繼續經營能力存在重大不確定性之核閱報告，符合同細則第49條第1項第3款規定，爰將其上市有價證券併案列為變更交易方法。",
+  "result": "變更交易方法",
+  "subject": "本公司接獲證交所通知上市有價證券併案列為變更交易方法",
+  "spoke_date": "20261117",
+  "spoke_time": "191914",
+  "seq_no": "1",
+  "source": "MOPS",
+  "first_seen": "2026-11-17",
+  "has_futures": false
+ },
+ {
+  "stock_id": "8277",
+  "name": "商丞",
+  "market": "上櫃",
+  "event": "續列全額",
+  "is_correction": false,
+  "announce_date": "2026-11-17",
+  "announce_time": "194631",
+  "effective_date": "2026-11-19",
+  "reason_tags": [
+   "淨值低於股本1/2"
+  ],
+  "reason": "本公司前因公告並申報115年第2季之財務報告顯示淨值已低於所列示股本二分之一，而採預收款券方式交易。本次公告並申報115年第3季財務報告顯示其淨值已不低於所列示股本二分之一，惟淨值仍未較前期增加，依本中心業務規則第12條第1項第1款及第4項第1款規定，證券經紀商於接受委託買賣該公司有價證券時，應繼續先收足款券始得辦理買賣申報。",
+  "result": "變更交易方法",
+  "subject": "公告本公司股票繼續變更交易方法",
+  "spoke_date": "20261117",
+  "spoke_time": "194631",
+  "seq_no": "1",
+  "source": "MOPS",
+  "first_seen": "2026-11-17",
+  "has_futures": false
  }
 ]

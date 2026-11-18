@@ -230,10 +230,10 @@
   "8084": {
    "name": "巨虹",
    "market": "上櫃",
-   "altered": true,
+   "altered": false,
    "periodic": false,
    "managed": false,
-   "suspended": false,
+   "suspended": true,
    "freq": ""
   },
   "8277": {
@@ -273,6 +273,6 @@
    "freq": ""
   }
  },
- "fetched_at": "2026-11-17T12:12:40",
- "date": "2026-11-17"
+ "fetched_at": "2026-11-18T12:16:12",
+ "date": "2026-11-18"
 }

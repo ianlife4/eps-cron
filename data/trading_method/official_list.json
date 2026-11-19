@@ -51,7 +51,7 @@
    "name": "力銘",
    "market": "上市",
    "altered": true,
-   "periodic": false,
+   "periodic": true,
    "managed": false,
    "suspended": false,
    "freq": ""
@@ -141,10 +141,10 @@
    "name": "研勤",
    "market": "上櫃",
    "altered": true,
-   "periodic": true,
+   "periodic": false,
    "managed": false,
    "suspended": false,
-   "freq": "030"
+   "freq": ""
   },
   "3664": {
    "name": "安瑞-KY",
@@ -157,6 +157,15 @@
   },
   "3710": {
    "name": "連展投控",
+   "market": "上櫃",
+   "altered": true,
+   "periodic": false,
+   "managed": false,
+   "suspended": false,
+   "freq": ""
+  },
+  "4304": {
+   "name": "勝昱",
    "market": "上櫃",
    "altered": true,
    "periodic": false,
@@ -193,15 +202,6 @@
   },
   "5301": {
    "name": "寶得利",
-   "market": "上櫃",
-   "altered": true,
-   "periodic": false,
-   "managed": false,
-   "suspended": false,
-   "freq": ""
-  },
-  "5355": {
-   "name": "佳總",
    "market": "上櫃",
    "altered": true,
    "periodic": false,
@@ -248,10 +248,10 @@
   "8291": {
    "name": "尚茂",
    "market": "上櫃",
-   "altered": true,
+   "altered": false,
    "periodic": false,
    "managed": false,
-   "suspended": false,
+   "suspended": true,
    "freq": ""
   },
   "8444": {
@@ -273,6 +273,6 @@
    "freq": ""
   }
  },
- "fetched_at": "2026-11-18T12:16:12",
- "date": "2026-11-18"
+ "fetched_at": "2026-11-19T12:12:10",
+ "date": "2026-11-19"
 }

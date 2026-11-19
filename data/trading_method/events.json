@@ -1886,5 +1886,27 @@
   "source": "MOPS",
   "first_seen": "2026-11-18",
   "has_futures": false
+ },
+ {
+  "stock_id": "3625",
+  "name": "西勝",
+  "market": "上櫃",
+  "event": "續列全額",
+  "is_correction": false,
+  "announce_date": "2026-11-19",
+  "announce_time": "143221",
+  "effective_date": "2026-11-19",
+  "reason_tags": [
+   "淨值低於股本1/2"
+  ],
+  "reason": "依證券商營業處所買賣有價證券業務規則第12條第1項第1款及同條第4項第1款規定，本公司115年第3季財務報告顯示之淨值已不低於股本二分之一，惟淨值仍未較前期增加，故繼續維持原交易方式。",
+  "result": "變更交易方法",
+  "subject": "(補充115年11月17日公告)本公司上櫃有價證券繼續維持變更交易方法(繼續採預收款券方式交易)",
+  "spoke_date": "20261119",
+  "spoke_time": "143221",
+  "seq_no": "1",
+  "source": "MOPS",
+  "first_seen": "2026-11-19",
+  "has_futures": false
  }
 ]
